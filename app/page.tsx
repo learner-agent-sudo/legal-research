@@ -281,7 +281,7 @@ export default function HomePage() {
       </section>
 
       {Object.keys(results).length > 0 && (
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="space-y-4">
           {selected.map((id) => {
             const model = allModels.find((m) => m.id === id);
             const r = results[id];
