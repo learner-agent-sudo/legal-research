@@ -10,6 +10,7 @@ import {
   saveSelectedModels,
 } from "@/lib/storage";
 import { buildVerificationPrompt } from "@/lib/prompts";
+import { humanizeError } from "@/lib/errors";
 
 type ResultState =
   | { status: "idle" }
@@ -302,9 +303,19 @@ export default function HomePage() {
                 {r.status === "loading" && (
                   <p className="text-sm text-slate-500">Working…</p>
                 )}
-                {r.status === "error" && (
-                  <p className="text-sm text-red-600">{r.error}</p>
-                )}
+                {r.status === "error" && (() => {
+                  const e = humanizeError(r.error, model.label);
+                  return (
+                    <div className="rounded border border-red-200 bg-red-50 p-3 text-sm">
+                      <p className="font-medium text-red-800">{e.title}</p>
+                      <p className="mt-1 text-red-700">{e.hint}</p>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs text-red-600">Technical details</summary>
+                        <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-red-900">{e.raw}</pre>
+                      </details>
+                    </div>
+                  );
+                })()}
                 {r.status === "ok" && (
                   <pre className="whitespace-pre-wrap text-sm">{r.text}</pre>
                 )}
