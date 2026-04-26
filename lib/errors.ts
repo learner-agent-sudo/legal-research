@@ -25,8 +25,20 @@ export function humanizeError(raw: string, providerLabel: string): FriendlyError
     };
   }
 
+  // OpenRouter-specific: "No endpoints found" — not a real 404, almost always a privacy or quota setting
+  if (lower.includes("no endpoints found")) {
+    return {
+      title: "OpenRouter free models blocked",
+      hint:
+        "This is an OpenRouter account setting, not a key problem. Two likely causes:\n" +
+        "1. Free-model privacy setting is OFF. Go to https://openrouter.ai/settings/privacy and enable logging on free providers (note: prompts may be used for training — don't use for sensitive client docs).\n" +
+        "2. You've hit OpenRouter's daily free quota (~50 req/day). Check https://openrouter.ai/activity — if so, wait until midnight UTC or use Groq/Gemini instead.",
+      raw,
+    };
+  }
+
   // 404 — model not found / retired
-  if (raw.includes("404") || lower.includes("no endpoints found") || lower.includes("model not found") || lower.includes("does not exist")) {
+  if (raw.includes("404") || lower.includes("model not found") || lower.includes("does not exist")) {
     return {
       title: "This model is no longer available",
       hint: "The provider has retired this model ID or temporarily disabled it. Pick another model, or update the ID in Settings (custom models).",
