@@ -13,6 +13,12 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(raw);
 }
 
+function getSecretOrNull(): Uint8Array | null {
+  const raw = process.env.SESSION_SECRET;
+  if (!raw || raw.length < 32) return null;
+  return new TextEncoder().encode(raw);
+}
+
 export type SessionPayload = {
   email: string;
 };
@@ -26,8 +32,10 @@ export async function createSessionToken(email: string): Promise<string> {
 }
 
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
+  const secret = getSecretOrNull();
+  if (!secret) return null;
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(token, secret);
     if (typeof payload.email !== "string") return null;
     return { email: payload.email };
   } catch {
@@ -52,10 +60,14 @@ export async function clearSessionCookie(): Promise<void> {
 }
 
 export async function getCurrentSession(): Promise<SessionPayload | null> {
-  const jar = await cookies();
-  const token = jar.get(COOKIE_NAME)?.value;
-  if (!token) return null;
-  return await verifySessionToken(token);
+  try {
+    const jar = await cookies();
+    const token = jar.get(COOKIE_NAME)?.value;
+    if (!token) return null;
+    return await verifySessionToken(token);
+  } catch {
+    return null;
+  }
 }
 
 // ---------- OTP helpers ----------

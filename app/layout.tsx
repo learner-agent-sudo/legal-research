@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { getCurrentSession } from "@/lib/auth/session";
+import { SignOutButton } from "@/components/SignOutButton";
 
 export const metadata: Metadata = {
   title: "Legal Research Cross-Verifier",
   description: "Paste an AI answer, upload a document, and verify with multiple free AI models.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getCurrentSession();
   return (
     <html lang="en">
       <body className="min-h-screen">
@@ -24,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
               </span>
             </Link>
-            <nav className="flex items-center gap-4 text-sm">
+            <nav className="flex items-center gap-3 text-sm">
               <Link href="/" className="text-slate-700 hover:text-slate-900">
                 Verify
               </Link>
@@ -37,6 +40,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               >
                 Settings
               </Link>
+              {session ? (
+                <span className="flex items-center gap-2 border-l pl-3">
+                  <span className="hidden text-xs text-slate-500 sm:inline">
+                    {session.email}
+                  </span>
+                  <SignOutButton />
+                </span>
+              ) : (
+                <Link
+                  href="/login"
+                  className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-blue-700 hover:bg-blue-100"
+                >
+                  Sign in
+                </Link>
+              )}
             </nav>
           </div>
         </header>
