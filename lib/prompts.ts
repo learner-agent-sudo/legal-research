@@ -33,6 +33,13 @@ const HONESTY_RULE =
   "Important: you cannot open URLs or browse the web. Verify based on your training only. " +
   "If you are not certain a citation is correct, say so explicitly — do NOT invent details.";
 
+const VERDICT_RULE =
+  "Format requirement: your VERY FIRST line must be exactly one of these three tags, on its own line:\n" +
+  "[GREEN] — no significant problems\n" +
+  "[YELLOW] — some concerns or partial issues\n" +
+  "[RED] — major errors or strong disagreement\n" +
+  "Then leave a blank line and write your full response in Markdown (use **bold** for the parts of the answer that are problematic).";
+
 function commonHeader(args: BuildPromptArgs): string {
   const parts: string[] = [];
   if (args.userQuestion?.trim()) {
@@ -51,10 +58,11 @@ export function buildVerificationPrompt(args: BuildPromptArgs): string {
   return [
     "You are assisting with legal-research cross-verification. Independently evaluate the answer below against the reference document and your legal knowledge.",
     HONESTY_RULE,
+    VERDICT_RULE,
     commonHeader(args),
     "Provide:\n" +
       "1. Overall assessment (agree / partially agree / disagree) with a one-sentence reason.\n" +
-      "2. Specific factual or legal errors (quote the part of the answer).\n" +
+      "2. Specific factual or legal errors — **bold** the exact phrases from the answer that are wrong.\n" +
       "3. Anything important missed from the document.\n" +
       "4. Your own concise answer to the original question.\n" +
       "Be direct. If the answer is correct, say so plainly.",
@@ -65,6 +73,8 @@ export function buildStatutePrompt(args: BuildPromptArgs): string {
   return [
     "You are a legal-citation auditor. Your ONLY job is to check every statute, ordinance, regulation, or section number cited in the answer below.",
     HONESTY_RULE,
+    VERDICT_RULE +
+      "\nUse [GREEN] if all citations look correct, [YELLOW] if some look wrong/unsure, [RED] if many appear wrong or fabricated.",
     commonHeader(args),
     "For each statute / section cited, output a row:\n" +
       "- Citation as written: ...\n" +
@@ -79,6 +89,8 @@ export function buildCaseLawPrompt(args: BuildPromptArgs): string {
   return [
     "You are a case-law auditor. Your ONLY job is to check every case cited in the answer below.",
     HONESTY_RULE,
+    VERDICT_RULE +
+      "\nUse [GREEN] if all cases look real and correctly used, [YELLOW] if some are unsure or misapplied, [RED] if any case looks fabricated.",
     commonHeader(args),
     "For each case cited, output a row:\n" +
       "- Case name as written: ...\n" +
@@ -96,6 +108,8 @@ export function buildLogicPrompt(args: BuildPromptArgs): string {
   return [
     "You are a legal-reasoning reviewer. Your ONLY job is to evaluate the LOGIC of the answer below — not whether citations are correct.",
     "Treat all cited authorities as if they exist and say what the answer claims. Focus purely on whether the argument flows.",
+    VERDICT_RULE +
+      "\nUse [GREEN] if the reasoning is sound, [YELLOW] for minor gaps, [RED] for serious logical flaws.",
     commonHeader(args),
     "Provide:\n" +
       "1. Does the conclusion follow from the premises? yes / partially / no — explain.\n" +
@@ -110,6 +124,8 @@ export function buildCounterPrompt(args: BuildPromptArgs): string {
   return [
     "You are opposing counsel. Your ONLY job is to build the STRONGEST argument AGAINST the answer below — the way an adversary would attack it in court.",
     HONESTY_RULE,
+    VERDICT_RULE +
+      "\nFor this role the verdict reflects how DAMAGING the counter-argument is to the original answer: [GREEN] = the answer holds up well, [YELLOW] = some weak spots, [RED] = serious counter-argument exists.",
     commonHeader(args),
     "Provide:\n" +
       "1. The single strongest counter-argument, in one paragraph.\n" +

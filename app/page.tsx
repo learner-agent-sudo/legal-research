@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { BUILTIN_PRESETS, type ModelPreset } from "@/lib/presets";
 import {
   loadApiKeys,
@@ -34,6 +36,52 @@ type ResultState =
   | { status: "ok"; text: string }
   | { status: "error"; error: string }
   | { status: "deeplink"; url: string };
+
+type Verdict = "green" | "yellow" | "red" | "none";
+
+function parseVerdict(text: string): { verdict: Verdict; body: string } {
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < Math.min(3, lines.length); i++) {
+    const line = lines[i].trim().toUpperCase();
+    if (line === "[GREEN]" || line.startsWith("[GREEN]")) {
+      return { verdict: "green", body: lines.slice(i + 1).join("\n").trimStart() };
+    }
+    if (line === "[YELLOW]" || line.startsWith("[YELLOW]")) {
+      return { verdict: "yellow", body: lines.slice(i + 1).join("\n").trimStart() };
+    }
+    if (line === "[RED]" || line.startsWith("[RED]")) {
+      return { verdict: "red", body: lines.slice(i + 1).join("\n").trimStart() };
+    }
+  }
+  return { verdict: "none", body: text };
+}
+
+const VERDICT_STYLES: Record<Verdict, { card: string; chip: string; chipText: string; emoji: string }> = {
+  green: {
+    card: "border-green-300 bg-green-50",
+    chip: "bg-green-200",
+    chipText: "Looks correct",
+    emoji: "✓",
+  },
+  yellow: {
+    card: "border-yellow-300 bg-yellow-50",
+    chip: "bg-yellow-200",
+    chipText: "Some concerns",
+    emoji: "!",
+  },
+  red: {
+    card: "border-red-300 bg-red-50",
+    chip: "bg-red-200",
+    chipText: "Major issues",
+    emoji: "✗",
+  },
+  none: {
+    card: "bg-white",
+    chip: "bg-slate-200",
+    chipText: "No verdict tag",
+    emoji: "?",
+  },
+};
 
 export default function HomePage() {
   const [userQuestion, setUserQuestion] = useState("");
@@ -445,24 +493,44 @@ export default function HomePage() {
           const model = allModels.find((m) => m.id === id);
           const r = results[id];
           if (!model || !r) return null;
+          const parsed = r.status === "ok" ? parseVerdict(r.text) : null;
+          const style = parsed ? VERDICT_STYLES[parsed.verdict] : VERDICT_STYLES.none;
           return (
-            <div key={id} className="rounded-lg border bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <div>
+            <div
+              key={id}
+              className={`rounded-lg border p-4 shadow-sm ${
+                r.status === "ok" ? style.card : "bg-white"
+              }`}
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
                   <h3 className="font-semibold">{model.label}</h3>
                   <p className="text-xs text-slate-500">Role: {ROLE_LABELS[getRole(id)]}</p>
                 </div>
-                {r.status === "ok" && (
-                  <button
-                    onClick={() => navigator.clipboard.writeText(r.text)}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    Copy
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {parsed && parsed.verdict !== "none" && (
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs font-medium ${style.chip}`}
+                    >
+                      {style.emoji} {style.chipText}
+                    </span>
+                  )}
+                  {r.status === "ok" && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(r.text)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Copy
+                    </button>
+                  )}
+                </div>
               </div>
               {r.status === "loading" && <p className="text-sm text-slate-500">Working…</p>}
-              {r.status === "ok" && <pre className="whitespace-pre-wrap text-sm">{r.text}</pre>}
+              {r.status === "ok" && parsed && (
+                <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
+                </div>
+              )}
               {r.status === "deeplink" && (
                 <div className="text-sm">
                   <p className="mb-2 text-slate-700">
