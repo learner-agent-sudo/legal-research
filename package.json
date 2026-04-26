@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
-    "@vercel/kv": "^3.0.0",
+    "@upstash/redis": "^1.37.0",
     "jose": "^6.2.2",
     "mammoth": "^1.8.0",
     "next": "^15.5.0",
