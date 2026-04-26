@@ -1,15 +1,18 @@
 import { Resend } from "resend";
+import { requireAscii } from "./sanitize";
 
 function client(): Resend {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) throw new Error("RESEND_API_KEY is not set.");
+  const key = requireAscii(process.env.RESEND_API_KEY, "RESEND_API_KEY");
   return new Resend(key);
 }
 
 const FROM_FALLBACK = "Legal Research <onboarding@resend.dev>";
 
 export async function sendOtpEmail(to: string, code: string): Promise<void> {
-  const from = process.env.EMAIL_FROM ?? FROM_FALLBACK;
+  const from = requireAscii(
+    process.env.EMAIL_FROM ?? FROM_FALLBACK,
+    "EMAIL_FROM"
+  );
   const resend = client();
 
   const { error } = await resend.emails.send({
