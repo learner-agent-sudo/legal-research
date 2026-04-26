@@ -48,6 +48,8 @@ export default function HomePage() {
   const [roles, setRoles] = useState<RoleMap>({});
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [results, setResults] = useState<Record<string, ResultState>>({});
+  const [orStatus, setOrStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [orError, setOrError] = useState<string>("");
 
   useEffect(() => {
     const custom = loadCustomModels();
@@ -55,7 +57,45 @@ export default function HomePage() {
     setApiKeys(loadApiKeys());
     setSelected(loadSelectedModels());
     setRoles(loadModelRoles());
+    fetchOpenRouterModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function fetchOpenRouterModels() {
+    setOrStatus("loading");
+    setOrError("");
+    try {
+      const res = await fetch("/api/openrouter-models");
+      const json = (await res.json()) as {
+        models?: { id: string; name: string; contextLength: number }[];
+        error?: string;
+      };
+      if (!res.ok || !json.models) throw new Error(json.error ?? `HTTP ${res.status}`);
+
+      const dynamic: ModelPreset[] = json.models.map((m) => ({
+        id: `openrouter-live-${m.id}`,
+        label: `${m.name} (OpenRouter, free)`,
+        provider: "openrouter",
+        kind: "openai-compat",
+        baseUrl: "https://openrouter.ai/api/v1",
+        modelId: m.id,
+        note:
+          m.contextLength > 0
+            ? `Context: ${m.contextLength.toLocaleString()} tokens`
+            : undefined,
+      }));
+
+      setAllModels((prev) => {
+        // remove any prior live OpenRouter entries, then add the fresh batch
+        const withoutLive = prev.filter((p) => !p.id.startsWith("openrouter-live-"));
+        return [...withoutLive, ...dynamic];
+      });
+      setOrStatus("ok");
+    } catch (err) {
+      setOrError(err instanceof Error ? err.message : "Failed");
+      setOrStatus("error");
+    }
+  }
 
   useEffect(() => {
     saveSelectedModels(selected);
@@ -258,10 +298,30 @@ export default function HomePage() {
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold">4. Pick AI models to verify with</h2>
-          <Link href="/settings" className="text-xs text-blue-600 hover:underline">
-            Manage keys & custom models →
-          </Link>
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={fetchOpenRouterModels}
+              disabled={orStatus === "loading"}
+              className="text-blue-600 hover:underline disabled:opacity-50"
+              title="Re-fetch the current list of free OpenRouter models"
+            >
+              {orStatus === "loading" ? "Refreshing OpenRouter…" : "Refresh OpenRouter list"}
+            </button>
+            <Link href="/settings" className="text-blue-600 hover:underline">
+              Settings →
+            </Link>
+          </div>
         </div>
+        {orStatus === "error" && (
+          <p className="mb-2 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
+            Couldn&apos;t load live OpenRouter models: {orError}. Built-in models still work.
+          </p>
+        )}
+        {orStatus === "ok" && (
+          <p className="mb-2 text-xs text-slate-500">
+            OpenRouter free models loaded live. List refreshes every 5 minutes.
+          </p>
+        )}
         <div className="space-y-3">
           {Object.entries(groupedModels).map(([group, items]) => (
             <div key={group}>
