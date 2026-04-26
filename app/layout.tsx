@@ -28,6 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/" className="text-slate-700 hover:text-slate-900">
                 Verify
               </Link>
+              <Link href="/prompts" className="text-slate-700 hover:text-slate-900">
+                Prompts
+              </Link>
               <Link
                 href="/settings"
                 className="rounded-md border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50"
