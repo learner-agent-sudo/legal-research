@@ -11,12 +11,15 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/kv": "^3.0.0",
+    "jose": "^6.2.2",
     "mammoth": "^1.8.0",
     "next": "^15.5.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "resend": "^6.12.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
