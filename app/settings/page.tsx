@@ -73,6 +73,12 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Settings</h1>
+        <p className="text-sm text-slate-600">
+          Add or update your free-tier API keys, and define custom OpenAI-compatible models.
+        </p>
+      </div>
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-base font-semibold">API keys</h2>
         <p className="mb-3 text-xs text-slate-600">

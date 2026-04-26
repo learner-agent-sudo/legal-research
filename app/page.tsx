@@ -6,12 +6,18 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { BUILTIN_PRESETS, type ModelPreset } from "@/lib/presets";
 import {
+  clearDraft,
   loadApiKeys,
   loadCustomModels,
+  loadDraft,
+  loadGroupState,
   loadModelRoles,
   loadSelectedModels,
+  saveDraft,
+  saveGroupState,
   saveModelRoles,
   saveSelectedModels,
+  type GroupState,
   type RoleMap,
 } from "@/lib/storage";
 import {
@@ -98,6 +104,9 @@ export default function HomePage() {
   const [results, setResults] = useState<Record<string, ResultState>>({});
   const [orStatus, setOrStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [orError, setOrError] = useState<string>("");
+  const [groupOpen, setGroupOpen] = useState<GroupState>({});
+  const [modelFilter, setModelFilter] = useState("");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const custom = loadCustomModels();
@@ -105,9 +114,36 @@ export default function HomePage() {
     setApiKeys(loadApiKeys());
     setSelected(loadSelectedModels());
     setRoles(loadModelRoles());
+    setGroupOpen(loadGroupState());
+    const draft = loadDraft();
+    if (draft) {
+      setUserQuestion(draft.userQuestion);
+      setClaudeAnswer(draft.claudeAnswer);
+      setDocumentText(draft.documentText);
+      setDocFileName(draft.docFileName);
+    }
+    setHydrated(true);
     fetchOpenRouterModels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveDraft({ userQuestion, claudeAnswer, documentText, docFileName });
+  }, [hydrated, userQuestion, claudeAnswer, documentText, docFileName]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveGroupState(groupOpen);
+  }, [hydrated, groupOpen]);
+
+  function toggleGroupOpen(group: string) {
+    setGroupOpen((prev) => ({ ...prev, [group]: !prev[group] }));
+  }
+
+  function isGroupOpen(group: string): boolean {
+    return groupOpen[group] ?? group === "groq";
+  }
 
   async function fetchOpenRouterModels() {
     setOrStatus("loading");
@@ -165,8 +201,12 @@ export default function HomePage() {
   const MANUAL_GROUP = "Manual paste (no API)";
 
   const groupedModels = useMemo<[string, ModelPreset[]][]>(() => {
+    const filter = modelFilter.trim().toLowerCase();
     const groups: Record<string, ModelPreset[]> = {};
     for (const m of allModels) {
+      if (filter && !m.label.toLowerCase().includes(filter) && !(m.modelId ?? "").toLowerCase().includes(filter)) {
+        continue;
+      }
       const key = m.kind === "deep-link" ? MANUAL_GROUP : m.provider;
       groups[key] = groups[key] ?? [];
       groups[key].push(m);
@@ -180,7 +220,10 @@ export default function HomePage() {
     const manual = entries.filter(([k]) => k === MANUAL_GROUP);
     const others = entries.filter(([k]) => k !== MANUAL_GROUP);
     return [...others, ...manual];
-  }, [allModels]);
+  }, [allModels, modelFilter]);
+
+  const totalSelected = selected.length;
+  const totalModels = allModels.length;
 
   function toggleGroup(items: ModelPreset[]) {
     const ids = items.map((m) => m.id);
@@ -315,12 +358,33 @@ export default function HomePage() {
     );
   }
 
+  const totalToRun = selected.length;
+  const totalDone = Object.values(results).filter(
+    (r) => r.status === "ok" || r.status === "error" || r.status === "deeplink"
+  ).length;
+  const isRunning = totalToRun > 0 && totalDone < totalToRun &&
+    Object.values(results).some((r) => r.status === "loading");
+
+  function sectionHeader(num: number, title: string, hint?: string) {
+    return (
+      <div className="mb-3 flex items-baseline gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+          {num}
+        </span>
+        <div>
+          <h2 className="text-base font-semibold">{title}</h2>
+          {hint && <p className="text-xs text-slate-500">{hint}</p>}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-base font-semibold">1. Your question (optional)</h2>
+        {sectionHeader(1, "Your question", "Optional — gives the AI context for what was asked.")}
         <textarea
-          className="w-full resize-y rounded border p-2 text-sm"
+          className="w-full resize-y rounded border p-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200"
           rows={2}
           placeholder="What was the original legal question you asked Claude?"
           value={userQuestion}
@@ -329,30 +393,54 @@ export default function HomePage() {
       </section>
 
       <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-base font-semibold">2. Paste Claude&apos;s answer</h2>
+        {sectionHeader(2, "Paste Claude's answer", "The text you want other models to check.")}
         <textarea
-          className="w-full resize-y rounded border p-2 font-mono text-sm"
+          className="w-full resize-y rounded border p-2 font-mono text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200"
           rows={8}
           placeholder="Paste the answer you want verified..."
           value={claudeAnswer}
           onChange={(e) => setClaudeAnswer(e.target.value)}
         />
+        <p className="mt-1 text-xs text-slate-500">
+          {claudeAnswer.length.toLocaleString()} chars · auto-saved in this browser
+        </p>
       </section>
 
       <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-base font-semibold">3. Reference document (.docx or .txt)</h2>
-        <input
-          type="file"
-          accept=".docx,.txt"
-          onChange={handleFileUpload}
-          className="text-sm"
-        />
+        {sectionHeader(3, "Reference document", "Upload a .docx or .txt — its text is sent along with the answer.")}
+        <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 hover:border-blue-300 hover:bg-slate-50">
+          <span className="text-base">📄</span>
+          <span>
+            <span className="font-medium text-slate-700">Click to upload</span> a .docx or .txt file
+          </span>
+          <input
+            type="file"
+            accept=".docx,.txt"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+        </label>
         {parsing && <p className="mt-2 text-xs text-slate-500">Parsing…</p>}
         {docError && <p className="mt-2 text-xs text-red-600">{docError}</p>}
         {docFileName && !parsing && !docError && (
-          <p className="mt-2 text-xs text-slate-600">
-            Loaded <span className="font-mono">{docFileName}</span> — {documentText.length.toLocaleString()} chars
-          </p>
+          <div className="mt-2 flex items-center justify-between rounded border bg-slate-50 px-3 py-2 text-xs">
+            <span>
+              <span className="font-medium">{docFileName}</span>
+              <span className="ml-2 text-slate-500">
+                {documentText.length.toLocaleString()} chars
+              </span>
+            </span>
+            <button
+              onClick={() => {
+                setDocFileName("");
+                setDocumentText("");
+                setDocError("");
+              }}
+              className="text-slate-500 hover:text-red-600"
+            >
+              Remove
+            </button>
+          </div>
         )}
         {documentText && (
           <details className="mt-2">
@@ -366,8 +454,18 @@ export default function HomePage() {
       </section>
 
       <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold">4. Pick AI models to verify with</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+              4
+            </span>
+            <div>
+              <h2 className="text-base font-semibold">Pick AI models</h2>
+              <p className="text-xs text-slate-500">
+                {totalSelected} of {totalModels} selected
+              </p>
+            </div>
+          </div>
           <div className="flex items-center gap-3 text-xs">
             <button
               onClick={fetchOpenRouterModels}
@@ -375,111 +473,182 @@ export default function HomePage() {
               className="text-blue-600 hover:underline disabled:opacity-50"
               title="Re-fetch the current list of free OpenRouter models"
             >
-              {orStatus === "loading" ? "Refreshing OpenRouter…" : "Refresh OpenRouter list"}
+              {orStatus === "loading" ? "Refreshing…" : "Refresh OpenRouter"}
             </button>
             <Link href="/settings" className="text-blue-600 hover:underline">
               Settings →
             </Link>
           </div>
         </div>
+
+        <div className="mb-3 flex gap-2">
+          <input
+            type="search"
+            placeholder="Search models (name or ID)…"
+            value={modelFilter}
+            onChange={(e) => setModelFilter(e.target.value)}
+            className="flex-1 rounded border px-2 py-1 text-sm"
+          />
+          {modelFilter && (
+            <button
+              onClick={() => setModelFilter("")}
+              className="rounded border px-2 py-1 text-xs hover:bg-slate-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
         {orStatus === "error" && (
           <p className="mb-2 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
             Couldn&apos;t load live OpenRouter models: {orError}. Built-in models still work.
           </p>
         )}
-        {orStatus === "ok" && (
-          <p className="mb-2 text-xs text-slate-500">
-            OpenRouter free models loaded live. List refreshes every 5 minutes.
-          </p>
-        )}
-        <div className="space-y-3">
+
+        <div className="space-y-2">
+          {groupedModels.length === 0 && (
+            <p className="rounded border border-dashed p-4 text-center text-sm text-slate-500">
+              No models match &ldquo;{modelFilter}&rdquo;.
+            </p>
+          )}
           {groupedModels.map(([group, items]) => {
-            const allOn = items.every((m) => selected.includes(m.id));
-            const someOn = items.some((m) => selected.includes(m.id));
+            const groupSelected = items.filter((m) => selected.includes(m.id)).length;
+            const allOn = items.length > 0 && groupSelected === items.length;
+            const someOn = groupSelected > 0;
+            const open = isGroupOpen(group) || modelFilter.length > 0;
             return (
-            <div key={group}>
-              <label className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
-                <input
-                  type="checkbox"
-                  checked={allOn}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someOn && !allOn;
-                  }}
-                  onChange={() => toggleGroup(items)}
-                />
-                {group} ({items.length})
-              </label>
-              <div className="space-y-1">
-                {items.map((m) => {
-                  const isSelected = selected.includes(m.id);
-                  return (
-                    <div
-                      key={m.id}
-                      className="flex flex-col gap-2 rounded border p-2 text-sm hover:bg-slate-50 sm:flex-row sm:items-start"
-                    >
-                      <label className="flex flex-1 items-start gap-2">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleModel(m.id)}
-                          className="mt-1"
-                        />
-                        <span>
-                          <span className="block">{m.label}</span>
-                          {m.note && (
-                            <span className="block text-xs text-slate-500">{m.note}</span>
+              <div key={group} className="rounded-md border">
+                <div className="flex items-center justify-between border-b bg-slate-50 px-3 py-2">
+                  <label className="flex flex-1 cursor-pointer items-center gap-2 text-xs font-semibold uppercase text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={allOn}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someOn && !allOn;
+                      }}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleGroup(items);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span onClick={() => toggleGroupOpen(group)} className="flex-1">
+                      {group}{" "}
+                      <span className="font-normal normal-case text-slate-500">
+                        ({groupSelected > 0 ? `${groupSelected}/` : ""}
+                        {items.length})
+                      </span>
+                    </span>
+                  </label>
+                  <button
+                    onClick={() => toggleGroupOpen(group)}
+                    className="ml-2 text-xs text-slate-500 hover:text-slate-800"
+                    aria-label={open ? "Collapse" : "Expand"}
+                  >
+                    {open ? "▾" : "▸"}
+                  </button>
+                </div>
+                {open && (
+                  <div className="space-y-1 p-2">
+                    {items.map((m) => {
+                      const isSelected = selected.includes(m.id);
+                      return (
+                        <div
+                          key={m.id}
+                          className={`flex flex-col gap-2 rounded border p-2 text-sm sm:flex-row sm:items-start ${
+                            isSelected ? "border-blue-300 bg-blue-50/40" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <label className="flex flex-1 items-start gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleModel(m.id)}
+                              className="mt-1"
+                            />
+                            <span className="min-w-0">
+                              <span className="block">{m.label}</span>
+                              {m.note && (
+                                <span className="block text-xs text-slate-500">{m.note}</span>
+                              )}
+                            </span>
+                          </label>
+                          {isSelected && (
+                            <div className="flex shrink-0 items-center gap-1 sm:ml-2">
+                              <label className="text-xs text-slate-500">Role:</label>
+                              <select
+                                value={getRole(m.id)}
+                                onChange={(e) =>
+                                  setRoleFor(m.id, e.target.value as VerificationRole)
+                                }
+                                className="rounded border bg-white px-1 py-0.5 text-xs"
+                                title={ROLE_DESCRIPTIONS[getRole(m.id)]}
+                              >
+                                {ROLE_OPTIONS.map((role) => (
+                                  <option key={role} value={role}>
+                                    {ROLE_LABELS[role]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           )}
-                        </span>
-                      </label>
-                      {isSelected && (
-                        <div className="flex shrink-0 items-center gap-1 sm:ml-2">
-                          <label className="text-xs text-slate-500">Role:</label>
-                          <select
-                            value={getRole(m.id)}
-                            onChange={(e) =>
-                              setRoleFor(m.id, e.target.value as VerificationRole)
-                            }
-                            className="rounded border bg-white px-1 py-0.5 text-xs"
-                            title={ROLE_DESCRIPTIONS[getRole(m.id)]}
-                          >
-                            {ROLE_OPTIONS.map((role) => (
-                              <option key={role} value={role}>
-                                {ROLE_LABELS[role]}
-                              </option>
-                            ))}
-                          </select>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
             );
           })}
         </div>
       </section>
 
-      <section className="flex gap-2">
-        <button
-          onClick={runVerify}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Verify with {selected.length || 0} model{selected.length === 1 ? "" : "s"}
-        </button>
-        <button
-          onClick={() => {
-            setClaudeAnswer("");
-            setUserQuestion("");
-            setDocumentText("");
-            setDocFileName("");
-            setResults({});
-          }}
-          className="rounded-md border px-4 py-2 text-sm"
-        >
-          Reset
-        </button>
-      </section>
+      {/* sticky action bar — fixed at the bottom of the viewport */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-white/95 shadow-lg backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="text-sm">
+            {isRunning ? (
+              <span className="text-slate-700">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-600 align-middle"></span>{" "}
+                Verifying… {totalDone}/{totalToRun} models replied
+              </span>
+            ) : selected.length === 0 ? (
+              <span className="text-slate-500">Pick at least one model below.</span>
+            ) : (
+              <span className="text-slate-700">
+                Ready to verify with{" "}
+                <span className="font-semibold">{selected.length}</span>{" "}
+                model{selected.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (!confirm("Clear all inputs and results?")) return;
+                setClaudeAnswer("");
+                setUserQuestion("");
+                setDocumentText("");
+                setDocFileName("");
+                setResults({});
+                clearDraft();
+              }}
+              className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              Reset
+            </button>
+            <button
+              onClick={runVerify}
+              disabled={isRunning || !claudeAnswer.trim() || selected.length === 0}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isRunning
+                ? "Working…"
+                : `Verify${selected.length ? ` with ${selected.length}` : ""}`}
+            </button>
+          </div>
+        </div>
+      </div>
 
       {Object.keys(results).length > 0 && (() => {
         const orderedIds = selected.filter((id) => results[id]);
@@ -525,7 +694,13 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              {r.status === "loading" && <p className="text-sm text-slate-500">Working…</p>}
+              {r.status === "loading" && (
+                <div className="space-y-2">
+                  <div className="h-3 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200" />
+                </div>
+              )}
               {r.status === "ok" && parsed && (
                 <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
@@ -567,8 +742,21 @@ export default function HomePage() {
           );
         };
 
+        const okCount = orderedIds.filter((id) => results[id]?.status === "ok").length;
+
         return (
           <section className="space-y-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-2">
+              <div className="flex items-baseline gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                  5
+                </span>
+                <h2 className="text-base font-semibold">Results</h2>
+              </div>
+              <p className="text-xs text-slate-500">
+                {okCount} success · {errorIds.length} failed · {orderedIds.length} total
+              </p>
+            </div>
             {successIds.map(renderCard)}
             {errorIds.length > 0 && (
               <details className="rounded-lg border bg-slate-50 p-3 text-sm">
