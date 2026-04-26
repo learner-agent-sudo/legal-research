@@ -79,6 +79,7 @@ export default function HomePage() {
         kind: "openai-compat",
         baseUrl: "https://openrouter.ai/api/v1",
         modelId: m.id,
+        contextLength: m.contextLength > 0 ? m.contextLength : undefined,
         note:
           m.contextLength > 0
             ? `Context: ${m.contextLength.toLocaleString()} tokens`
@@ -113,15 +114,36 @@ export default function HomePage() {
     return roles[id] ?? "comprehensive";
   }
 
-  const groupedModels = useMemo(() => {
+  const MANUAL_GROUP = "Manual paste (no API)";
+
+  const groupedModels = useMemo<[string, ModelPreset[]][]>(() => {
     const groups: Record<string, ModelPreset[]> = {};
     for (const m of allModels) {
-      const key = m.kind === "deep-link" ? "Manual paste (no API)" : m.provider;
+      const key = m.kind === "deep-link" ? MANUAL_GROUP : m.provider;
       groups[key] = groups[key] ?? [];
       groups[key].push(m);
     }
-    return groups;
+    if (groups.openrouter) {
+      groups.openrouter.sort(
+        (a, b) => (b.contextLength ?? 0) - (a.contextLength ?? 0)
+      );
+    }
+    const entries = Object.entries(groups);
+    const manual = entries.filter(([k]) => k === MANUAL_GROUP);
+    const others = entries.filter(([k]) => k !== MANUAL_GROUP);
+    return [...others, ...manual];
   }, [allModels]);
+
+  function toggleGroup(items: ModelPreset[]) {
+    const ids = items.map((m) => m.id);
+    const allOn = ids.every((id) => selected.includes(id));
+    setSelected((prev) => {
+      if (allOn) return prev.filter((id) => !ids.includes(id));
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return Array.from(next);
+    });
+  }
 
   function toggleModel(id: string) {
     setSelected((prev) =>
@@ -323,9 +345,22 @@ export default function HomePage() {
           </p>
         )}
         <div className="space-y-3">
-          {Object.entries(groupedModels).map(([group, items]) => (
+          {groupedModels.map(([group, items]) => {
+            const allOn = items.every((m) => selected.includes(m.id));
+            const someOn = items.some((m) => selected.includes(m.id));
+            return (
             <div key={group}>
-              <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">{group}</h3>
+              <label className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+                <input
+                  type="checkbox"
+                  checked={allOn}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someOn && !allOn;
+                  }}
+                  onChange={() => toggleGroup(items)}
+                />
+                {group} ({items.length})
+              </label>
               <div className="space-y-1">
                 {items.map((m) => {
                   const isSelected = selected.includes(m.id);
@@ -372,7 +407,8 @@ export default function HomePage() {
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

@@ -9,6 +9,7 @@ export type ModelPreset = {
   modelId?: string;
   deepLinkUrl?: string;
   note?: string;
+  contextLength?: number;
 };
 
 export const BUILTIN_PRESETS: ModelPreset[] = [
