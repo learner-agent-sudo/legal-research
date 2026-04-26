@@ -6,11 +6,27 @@ import { BUILTIN_PRESETS, type ModelPreset } from "@/lib/presets";
 import {
   loadApiKeys,
   loadCustomModels,
+  loadModelRoles,
   loadSelectedModels,
+  saveModelRoles,
   saveSelectedModels,
+  type RoleMap,
 } from "@/lib/storage";
-import { buildVerificationPrompt } from "@/lib/prompts";
+import {
+  buildPromptForRole,
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
+  type VerificationRole,
+} from "@/lib/prompts";
 import { humanizeError } from "@/lib/errors";
+
+const ROLE_OPTIONS: VerificationRole[] = [
+  "comprehensive",
+  "statute",
+  "case-law",
+  "logic",
+  "counter",
+];
 
 type ResultState =
   | { status: "idle" }
@@ -29,6 +45,7 @@ export default function HomePage() {
 
   const [allModels, setAllModels] = useState<ModelPreset[]>(BUILTIN_PRESETS);
   const [selected, setSelected] = useState<string[]>([]);
+  const [roles, setRoles] = useState<RoleMap>({});
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [results, setResults] = useState<Record<string, ResultState>>({});
 
@@ -37,11 +54,24 @@ export default function HomePage() {
     setAllModels([...BUILTIN_PRESETS, ...custom]);
     setApiKeys(loadApiKeys());
     setSelected(loadSelectedModels());
+    setRoles(loadModelRoles());
   }, []);
 
   useEffect(() => {
     saveSelectedModels(selected);
   }, [selected]);
+
+  useEffect(() => {
+    saveModelRoles(roles);
+  }, [roles]);
+
+  function setRoleFor(id: string, role: VerificationRole) {
+    setRoles((prev) => ({ ...prev, [id]: role }));
+  }
+
+  function getRole(id: string): VerificationRole {
+    return roles[id] ?? "comprehensive";
+  }
 
   const groupedModels = useMemo(() => {
     const groups: Record<string, ModelPreset[]> = {};
@@ -107,12 +137,6 @@ export default function HomePage() {
       return;
     }
 
-    const prompt = buildVerificationPrompt({
-      claudeAnswer,
-      documentText,
-      userQuestion,
-    });
-
     const initial: Record<string, ResultState> = {};
     selected.forEach((id) => (initial[id] = { status: "loading" }));
     setResults(initial);
@@ -124,6 +148,12 @@ export default function HomePage() {
           setResults((r) => ({ ...r, [id]: { status: "error", error: "Model not found" } }));
           return;
         }
+
+        const prompt = buildPromptForRole(getRole(id), {
+          claudeAnswer,
+          documentText,
+          userQuestion,
+        });
 
         if (model.kind === "deep-link") {
           try {
@@ -236,24 +266,50 @@ export default function HomePage() {
           {Object.entries(groupedModels).map(([group, items]) => (
             <div key={group}>
               <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">{group}</h3>
-              <div className="grid gap-1 sm:grid-cols-2">
-                {items.map((m) => (
-                  <label
-                    key={m.id}
-                    className="flex items-start gap-2 rounded border p-2 text-sm hover:bg-slate-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(m.id)}
-                      onChange={() => toggleModel(m.id)}
-                      className="mt-1"
-                    />
-                    <span>
-                      <span className="block">{m.label}</span>
-                      {m.note && <span className="block text-xs text-slate-500">{m.note}</span>}
-                    </span>
-                  </label>
-                ))}
+              <div className="space-y-1">
+                {items.map((m) => {
+                  const isSelected = selected.includes(m.id);
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex flex-col gap-2 rounded border p-2 text-sm hover:bg-slate-50 sm:flex-row sm:items-start"
+                    >
+                      <label className="flex flex-1 items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleModel(m.id)}
+                          className="mt-1"
+                        />
+                        <span>
+                          <span className="block">{m.label}</span>
+                          {m.note && (
+                            <span className="block text-xs text-slate-500">{m.note}</span>
+                          )}
+                        </span>
+                      </label>
+                      {isSelected && (
+                        <div className="flex shrink-0 items-center gap-1 sm:ml-2">
+                          <label className="text-xs text-slate-500">Role:</label>
+                          <select
+                            value={getRole(m.id)}
+                            onChange={(e) =>
+                              setRoleFor(m.id, e.target.value as VerificationRole)
+                            }
+                            className="rounded border bg-white px-1 py-0.5 text-xs"
+                            title={ROLE_DESCRIPTIONS[getRole(m.id)]}
+                          >
+                            {ROLE_OPTIONS.map((role) => (
+                              <option key={role} value={role}>
+                                {ROLE_LABELS[role]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -290,7 +346,12 @@ export default function HomePage() {
             return (
               <div key={id} className="rounded-lg border bg-white p-4 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-semibold">{model.label}</h3>
+                  <div>
+                    <h3 className="font-semibold">{model.label}</h3>
+                    <p className="text-xs text-slate-500">
+                      Role: {ROLE_LABELS[getRole(id)]}
+                    </p>
+                  </div>
                   {r.status === "ok" && (
                     <button
                       onClick={() => navigator.clipboard.writeText(r.text)}

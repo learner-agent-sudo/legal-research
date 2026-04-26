@@ -1,8 +1,10 @@
 import type { ModelPreset } from "./presets";
+import type { VerificationRole } from "./prompts";
 
 const KEYS_STORAGE = "lr.apiKeys.v1";
 const CUSTOM_MODELS_STORAGE = "lr.customModels.v1";
 const SELECTED_MODELS_STORAGE = "lr.selectedModels.v1";
+const ROLES_STORAGE = "lr.modelRoles.v1";
 
 export type ApiKeyMap = Record<string, string>;
 
@@ -49,4 +51,21 @@ export function loadSelectedModels(): string[] {
 export function saveSelectedModels(ids: string[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SELECTED_MODELS_STORAGE, JSON.stringify(ids));
+}
+
+export type RoleMap = Record<string, VerificationRole>;
+
+export function loadModelRoles(): RoleMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(ROLES_STORAGE);
+    return raw ? (JSON.parse(raw) as RoleMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveModelRoles(map: RoleMap) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ROLES_STORAGE, JSON.stringify(map));
 }
