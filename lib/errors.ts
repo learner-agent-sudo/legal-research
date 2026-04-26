@@ -25,6 +25,15 @@ export function humanizeError(raw: string, providerLabel: string): FriendlyError
     };
   }
 
+  // Decommissioned model
+  if (lower.includes("decommissioned") || lower.includes("model_decommissioned") || lower.includes("has been retired")) {
+    return {
+      title: "Model retired by provider",
+      hint: "The provider has shut this model down. Untick it and pick a current one — it won't come back.",
+      raw,
+    };
+  }
+
   // OpenRouter-specific: "No endpoints found" — not a real 404, almost always a privacy or quota setting
   if (lower.includes("no endpoints found")) {
     return {

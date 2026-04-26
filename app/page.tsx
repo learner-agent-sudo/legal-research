@@ -433,69 +433,86 @@ export default function HomePage() {
         </button>
       </section>
 
-      {Object.keys(results).length > 0 && (
-        <section className="space-y-4">
-          {selected.map((id) => {
-            const model = allModels.find((m) => m.id === id);
-            const r = results[id];
-            if (!model || !r) return null;
-            return (
-              <div key={id} className="rounded-lg border bg-white p-4 shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold">{model.label}</h3>
-                    <p className="text-xs text-slate-500">
-                      Role: {ROLE_LABELS[getRole(id)]}
-                    </p>
-                  </div>
-                  {r.status === "ok" && (
-                    <button
-                      onClick={() => navigator.clipboard.writeText(r.text)}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Copy
-                    </button>
-                  )}
+      {Object.keys(results).length > 0 && (() => {
+        const orderedIds = selected.filter((id) => results[id]);
+        const successIds = orderedIds.filter((id) => {
+          const s = results[id]?.status;
+          return s === "ok" || s === "deeplink" || s === "loading";
+        });
+        const errorIds = orderedIds.filter((id) => results[id]?.status === "error");
+
+        const renderCard = (id: string) => {
+          const model = allModels.find((m) => m.id === id);
+          const r = results[id];
+          if (!model || !r) return null;
+          return (
+            <div key={id} className="rounded-lg border bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">{model.label}</h3>
+                  <p className="text-xs text-slate-500">Role: {ROLE_LABELS[getRole(id)]}</p>
                 </div>
-                {r.status === "loading" && (
-                  <p className="text-sm text-slate-500">Working…</p>
-                )}
-                {r.status === "error" && (() => {
-                  const e = humanizeError(r.error, model.label);
-                  return (
-                    <div className="rounded border border-red-200 bg-red-50 p-3 text-sm">
-                      <p className="font-medium text-red-800">{e.title}</p>
-                      <p className="mt-1 text-red-700">{e.hint}</p>
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-xs text-red-600">Technical details</summary>
-                        <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-red-900">{e.raw}</pre>
-                      </details>
-                    </div>
-                  );
-                })()}
                 {r.status === "ok" && (
-                  <pre className="whitespace-pre-wrap text-sm">{r.text}</pre>
-                )}
-                {r.status === "deeplink" && (
-                  <div className="text-sm">
-                    <p className="mb-2 text-slate-700">
-                      Prompt copied to clipboard. Open the site and paste:
-                    </p>
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700"
-                    >
-                      Open {model.label}
-                    </a>
-                  </div>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(r.text)}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Copy
+                  </button>
                 )}
               </div>
-            );
-          })}
-        </section>
-      )}
+              {r.status === "loading" && <p className="text-sm text-slate-500">Working…</p>}
+              {r.status === "ok" && <pre className="whitespace-pre-wrap text-sm">{r.text}</pre>}
+              {r.status === "deeplink" && (
+                <div className="text-sm">
+                  <p className="mb-2 text-slate-700">
+                    Prompt copied to clipboard. Open the site and paste:
+                  </p>
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700"
+                  >
+                    Open {model.label}
+                  </a>
+                </div>
+              )}
+              {r.status === "error" && (() => {
+                const e = humanizeError(r.error, model.label);
+                return (
+                  <div className="rounded border border-red-200 bg-red-50 p-3 text-sm">
+                    <p className="font-medium text-red-800">{e.title}</p>
+                    <p className="mt-1 whitespace-pre-line text-red-700">{e.hint}</p>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-red-600">
+                        Technical details
+                      </summary>
+                      <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-red-900">
+                        {e.raw}
+                      </pre>
+                    </details>
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        };
+
+        return (
+          <section className="space-y-4">
+            {successIds.map(renderCard)}
+            {errorIds.length > 0 && (
+              <details className="rounded-lg border bg-slate-50 p-3 text-sm">
+                <summary className="cursor-pointer font-medium text-slate-700">
+                  {errorIds.length} model{errorIds.length === 1 ? "" : "s"} failed (click to expand)
+                </summary>
+                <div className="mt-3 space-y-3">{errorIds.map(renderCard)}</div>
+              </details>
+            )}
+          </section>
+        );
+      })()}
     </div>
   );
 }

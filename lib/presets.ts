@@ -22,20 +22,12 @@ export const BUILTIN_PRESETS: ModelPreset[] = [
     modelId: "llama-3.3-70b-versatile",
   },
   {
-    id: "groq-deepseek-r1-distill",
-    label: "DeepSeek R1 Distill (Groq, free)",
+    id: "groq-llama-3.1-8b",
+    label: "Llama 3.1 8B Instant (Groq, free)",
     provider: "groq",
     kind: "openai-compat",
     baseUrl: "https://api.groq.com/openai/v1",
-    modelId: "deepseek-r1-distill-llama-70b",
-  },
-  {
-    id: "groq-qwen-2.5-32b",
-    label: "Qwen 2.5 32B (Groq, free)",
-    provider: "groq",
-    kind: "openai-compat",
-    baseUrl: "https://api.groq.com/openai/v1",
-    modelId: "qwen-2.5-32b",
+    modelId: "llama-3.1-8b-instant",
   },
   {
     id: "gemini-2.5-flash",
