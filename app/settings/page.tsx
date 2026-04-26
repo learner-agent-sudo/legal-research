@@ -7,10 +7,13 @@ import {
   type ModelPreset,
 } from "@/lib/presets";
 import {
+  exportConfig,
+  importConfig,
   loadApiKeys,
   loadCustomModels,
   saveApiKeys,
   saveCustomModels,
+  type ImportSummary,
 } from "@/lib/storage";
 
 const KNOWN_PROVIDERS = ["groq", "openrouter", "gemini", "mistral"];
@@ -19,6 +22,8 @@ export default function SettingsPage() {
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [custom, setCustom] = useState<ModelPreset[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [ioMessage, setIoMessage] = useState<string>("");
+  const [ioError, setIoError] = useState<string>("");
 
   // form state for adding a custom model
   const [form, setForm] = useState({
@@ -71,6 +76,45 @@ export default function SettingsPage() {
     saveCustomModels(next);
   }
 
+  function handleExport() {
+    const cfg = exportConfig();
+    const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `legal-research-config-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setIoMessage("Saved a JSON file. Treat it like a password file — the keys are unencrypted.");
+    setIoError("");
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIoMessage("");
+    setIoError("");
+    try {
+      const text = await file.text();
+      const json: unknown = JSON.parse(text);
+      const summary: ImportSummary = importConfig(json);
+      setKeys(loadApiKeys());
+      setCustom(loadCustomModels());
+      setIoMessage(
+        `Imported: ${summary.apiKeys} keys · ${summary.customModels} custom models · ` +
+          `${summary.selectedModels} selections · ${summary.modelRoles} role assignments. ` +
+          "Refresh the home page to see them."
+      );
+    } catch (err) {
+      setIoError(err instanceof Error ? err.message : "Could not import this file.");
+    } finally {
+      e.target.value = ""; // allow re-importing the same file
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -120,6 +164,43 @@ export default function SettingsPage() {
           </button>
           {savedFlash && <span className="text-xs text-green-600">Saved.</span>}
         </div>
+      </section>
+
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold">Move keys to another computer</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Export everything (keys + custom models + selections) into a single JSON file, then
+          import it on another browser or computer. Useful when you want to use the site from
+          a second machine without re-typing keys.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExport}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            Export to file
+          </button>
+          <label className="cursor-pointer rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50">
+            Import from file
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImport}
+              className="hidden"
+            />
+          </label>
+        </div>
+        {ioMessage && (
+          <p className="mt-3 rounded bg-green-50 p-2 text-xs text-green-800">{ioMessage}</p>
+        )}
+        {ioError && (
+          <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-800">{ioError}</p>
+        )}
+        <p className="mt-3 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
+          ⚠ The exported file contains your API keys in <strong>plain text</strong>. Save it
+          somewhere private (e.g. a password manager attachment), and don&apos;t email or
+          message it.
+        </p>
       </section>
 
       <section className="rounded-lg border bg-white p-4 shadow-sm">

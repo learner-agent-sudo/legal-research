@@ -115,3 +115,73 @@ export function saveGroupState(state: GroupState) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(GROUP_STATE_STORAGE, JSON.stringify(state));
 }
+
+export type ExportedConfig = {
+  version: 1;
+  exportedAt: string;
+  apiKeys: ApiKeyMap;
+  customModels: ModelPreset[];
+  selectedModels: string[];
+  modelRoles: RoleMap;
+  groupState: GroupState;
+};
+
+export function exportConfig(): ExportedConfig {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    apiKeys: loadApiKeys(),
+    customModels: loadCustomModels(),
+    selectedModels: loadSelectedModels(),
+    modelRoles: loadModelRoles(),
+    groupState: loadGroupState(),
+  };
+}
+
+export type ImportSummary = {
+  apiKeys: number;
+  customModels: number;
+  selectedModels: number;
+  modelRoles: number;
+  groupState: number;
+};
+
+export function importConfig(raw: unknown): ImportSummary {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Imported file is not valid JSON.");
+  }
+  const cfg = raw as Partial<ExportedConfig>;
+  if (cfg.version !== 1) {
+    throw new Error(`Unknown config version: ${String(cfg.version)}.`);
+  }
+
+  const summary: ImportSummary = {
+    apiKeys: 0,
+    customModels: 0,
+    selectedModels: 0,
+    modelRoles: 0,
+    groupState: 0,
+  };
+
+  if (cfg.apiKeys && typeof cfg.apiKeys === "object") {
+    saveApiKeys(cfg.apiKeys);
+    summary.apiKeys = Object.keys(cfg.apiKeys).length;
+  }
+  if (Array.isArray(cfg.customModels)) {
+    saveCustomModels(cfg.customModels);
+    summary.customModels = cfg.customModels.length;
+  }
+  if (Array.isArray(cfg.selectedModels)) {
+    saveSelectedModels(cfg.selectedModels);
+    summary.selectedModels = cfg.selectedModels.length;
+  }
+  if (cfg.modelRoles && typeof cfg.modelRoles === "object") {
+    saveModelRoles(cfg.modelRoles);
+    summary.modelRoles = Object.keys(cfg.modelRoles).length;
+  }
+  if (cfg.groupState && typeof cfg.groupState === "object") {
+    saveGroupState(cfg.groupState);
+    summary.groupState = Object.keys(cfg.groupState).length;
+  }
+  return summary;
+}
