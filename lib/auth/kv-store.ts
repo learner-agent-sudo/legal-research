@@ -86,3 +86,30 @@ export async function setUserCustomModels(
 ): Promise<void> {
   await client().set(`user:${emailKey(email)}:custom-models`, models);
 }
+
+// ---------- Unified per-user data blob ----------
+//
+// Stores everything we want to sync across devices in one Redis key:
+//   user:<email>:data
+//
+// Keeping it in one blob avoids racey multi-key reads/writes for the
+// single-user case and makes the wire protocol trivial.
+
+export type UserDataBlob = {
+  apiKeys?: Record<string, string>;
+  customModels?: unknown[];
+  promptOverrides?: Record<string, string>;
+  modelRoles?: Record<string, string>;
+  updatedAt?: string;
+};
+
+export async function getUserData(email: string): Promise<UserDataBlob | null> {
+  return await client().get<UserDataBlob>(`user:${emailKey(email)}:data`);
+}
+
+export async function setUserData(email: string, data: UserDataBlob): Promise<void> {
+  await client().set(`user:${emailKey(email)}:data`, {
+    ...data,
+    updatedAt: new Date().toISOString(),
+  });
+}

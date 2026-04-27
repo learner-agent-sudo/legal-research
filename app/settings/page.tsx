@@ -15,8 +15,20 @@ import {
   saveCustomModels,
   type ImportSummary,
 } from "@/lib/storage";
+import {
+  pullFromServer,
+  pushSnapshot,
+  writeLocalSnapshot,
+} from "@/lib/sync";
 
 const KNOWN_PROVIDERS = ["groq", "openrouter", "gemini", "mistral"];
+
+type SyncState =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { status: "signed-in"; lastSyncedAt?: string }
+  | { status: "signed-out" }
+  | { status: "error"; message: string };
 
 export default function SettingsPage() {
   const [keys, setKeys] = useState<Record<string, string>>({});
@@ -24,6 +36,8 @@ export default function SettingsPage() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [ioMessage, setIoMessage] = useState<string>("");
   const [ioError, setIoError] = useState<string>("");
+  const [sync, setSync] = useState<SyncState>({ status: "idle" });
+  const [syncFlash, setSyncFlash] = useState<string>("");
 
   // form state for adding a custom model
   const [form, setForm] = useState({
@@ -37,12 +51,50 @@ export default function SettingsPage() {
   useEffect(() => {
     setKeys(loadApiKeys());
     setCustom(loadCustomModels());
+    void initialSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function initialSync() {
+    setSync({ status: "checking" });
+    const res = await pullFromServer();
+    if (!res.ok) {
+      if (res.reason === "not-signed-in") {
+        setSync({ status: "signed-out" });
+      } else if (res.reason === "not-configured") {
+        setSync({ status: "error", message: "Server sync isn't configured on this deployment." });
+      } else {
+        setSync({ status: "error", message: res.message ?? "Sync error" });
+      }
+      return;
+    }
+    if (res.data && Object.keys(res.data).length > 0) {
+      writeLocalSnapshot(res.data);
+      setKeys(res.data.apiKeys ?? {});
+      if (res.data.customModels) setCustom(res.data.customModels);
+    }
+    setSync({ status: "signed-in", lastSyncedAt: res.data?.updatedAt });
+  }
+
+  async function pushIfSignedIn() {
+    if (sync.status !== "signed-in") return;
+    const res = await pushSnapshot();
+    if (res.ok) {
+      setSync({ status: "signed-in", lastSyncedAt: new Date().toISOString() });
+      setSyncFlash("Synced to your account");
+      setTimeout(() => setSyncFlash(""), 1500);
+    } else if (res.reason === "not-signed-in") {
+      setSync({ status: "signed-out" });
+    } else {
+      setSync({ status: "error", message: res.message ?? "Sync error" });
+    }
+  }
 
   function handleSaveKeys() {
     saveApiKeys(keys);
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1500);
+    void pushIfSignedIn();
   }
 
   function handleAddCustom() {
@@ -68,12 +120,14 @@ export default function SettingsPage() {
       saveApiKeys(updatedKeys);
     }
     setForm({ label: "", provider: "", baseUrl: "", modelId: "", apiKey: "" });
+    void pushIfSignedIn();
   }
 
   function handleRemoveCustom(id: string) {
     const next = custom.filter((m) => m.id !== id);
     setCustom(next);
     saveCustomModels(next);
+    void pushIfSignedIn();
   }
 
   function handleExport() {
@@ -113,6 +167,7 @@ export default function SettingsPage() {
     } finally {
       e.target.value = ""; // allow re-importing the same file
     }
+    void pushIfSignedIn();
   }
 
   return (
@@ -123,6 +178,9 @@ export default function SettingsPage() {
           Add or update your free-tier API keys, and define custom OpenAI-compatible models.
         </p>
       </div>
+
+      <SyncBanner state={sync} flash={syncFlash} />
+
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-base font-semibold">API keys</h2>
         <p className="mb-3 text-xs text-slate-600">
@@ -302,4 +360,47 @@ export default function SettingsPage() {
       )}
     </div>
   );
+}
+
+function SyncBanner({ state, flash }: { state: SyncState; flash: string }) {
+  if (state.status === "checking") {
+    return (
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        Checking sync status…
+      </div>
+    );
+  }
+  if (state.status === "signed-in") {
+    return (
+      <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800">
+        ✓ Signed in. Your keys, custom models, prompt edits, and role assignments
+        sync to your account on every save.
+        {flash && <span className="ml-2 font-medium">{flash}</span>}
+        {state.lastSyncedAt && !flash && (
+          <span className="ml-2 text-slate-500">
+            Last synced {new Date(state.lastSyncedAt).toLocaleString()}.
+          </span>
+        )}
+      </div>
+    );
+  }
+  if (state.status === "signed-out") {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        ⓘ Not signed in. Settings are saved only in this browser.{" "}
+        <a href="/login" className="font-medium underline">
+          Sign in
+        </a>{" "}
+        to sync them across devices.
+      </div>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+        Sync error: {state.message}
+      </div>
+    );
+  }
+  return null;
 }
