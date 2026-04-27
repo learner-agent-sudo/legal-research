@@ -15,6 +15,7 @@ import {
   loadPromptOverrides,
   savePromptOverrides,
 } from "@/lib/storage";
+import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
 
 const ROLES: VerificationRole[] = [
   "comprehensive",
@@ -29,17 +30,45 @@ export default function PromptsPage() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [hydrated, setHydrated] = useState(false);
   const [savedFlash, setSavedFlash] = useState<string>("");
+  const [signedIn, setSignedIn] = useState<boolean>(false);
 
-  useEffect(() => {
-    const o = loadPromptOverrides();
-    setOverrides(o);
+  function applyOverridesToDrafts(o: PromptOverrides) {
     const initialDrafts: Record<string, string> = {};
     for (const r of ROLES) {
       initialDrafts[r] = o[r] ?? ROLE_TEMPLATES[r];
     }
     setDrafts(initialDrafts);
+  }
+
+  useEffect(() => {
+    const local = loadPromptOverrides();
+    setOverrides(local);
+    applyOverridesToDrafts(local);
     setHydrated(true);
+
+    // Pull from server in the background; if signed in and server has
+    // overrides, refresh local state with them.
+    void (async () => {
+      const res = await pullFromServer();
+      if (!res.ok) {
+        if (res.reason === "not-signed-in") setSignedIn(false);
+        return;
+      }
+      setSignedIn(true);
+      if (res.data) {
+        writeLocalSnapshot(res.data);
+        if (res.data.promptOverrides) {
+          setOverrides(res.data.promptOverrides);
+          applyOverridesToDrafts(res.data.promptOverrides);
+        }
+      }
+    })();
   }, []);
+
+  async function pushIfSignedIn() {
+    if (!signedIn) return;
+    await pushSnapshot();
+  }
 
   function isCustomized(role: VerificationRole): boolean {
     return overrides[role] !== undefined && overrides[role] !== ROLE_TEMPLATES[role];
@@ -59,6 +88,7 @@ export default function PromptsPage() {
     savePromptOverrides(next);
     setSavedFlash(role);
     setTimeout(() => setSavedFlash(""), 1500);
+    void pushIfSignedIn();
   }
 
   function handleReset(role: VerificationRole) {
@@ -68,6 +98,7 @@ export default function PromptsPage() {
     delete next[role];
     setOverrides(next);
     setDrafts((prev) => ({ ...prev, [role]: ROLE_TEMPLATES[role] }));
+    void pushIfSignedIn();
   }
 
   function handleChange(role: VerificationRole, value: string) {

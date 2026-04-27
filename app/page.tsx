@@ -29,6 +29,7 @@ import {
   type VerificationRole,
 } from "@/lib/prompts";
 import { humanizeError } from "@/lib/errors";
+import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -110,6 +111,7 @@ export default function HomePage() {
   const [modelFilter, setModelFilter] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>({});
+  const [signedIn, setSignedIn] = useState<boolean>(false);
 
   useEffect(() => {
     const custom = loadCustomModels();
@@ -128,8 +130,34 @@ export default function HomePage() {
     }
     setHydrated(true);
     fetchOpenRouterModels();
+
+    // Pull server snapshot in the background; if signed in, sync local state
+    void (async () => {
+      const res = await pullFromServer();
+      if (!res.ok) {
+        if (res.reason !== "not-signed-in") {
+          // server might be down or misconfigured; silent — local works
+        }
+        return;
+      }
+      setSignedIn(true);
+      if (res.data && Object.keys(res.data).length > 0) {
+        writeLocalSnapshot(res.data);
+        if (res.data.apiKeys) setApiKeys(res.data.apiKeys);
+        if (res.data.customModels) {
+          setAllModels([...BUILTIN_PRESETS, ...res.data.customModels]);
+        }
+        if (res.data.modelRoles) setRoles(res.data.modelRoles as RoleMap);
+        if (res.data.promptOverrides) setPromptOverrides(res.data.promptOverrides);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function pushIfSignedIn() {
+    if (!signedIn) return;
+    await pushSnapshot();
+  }
 
   useEffect(() => {
     if (!hydrated) return;
@@ -192,6 +220,8 @@ export default function HomePage() {
 
   useEffect(() => {
     saveModelRoles(roles);
+    if (hydrated) void pushIfSignedIn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roles]);
 
   function setRoleFor(id: string, role: VerificationRole) {
