@@ -385,7 +385,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
+      <section className="rounded-lg border bg-white p-3 shadow-sm sm:p-4">
         {sectionHeader(1, "Your question", "Optional — gives the AI context for what was asked.")}
         <textarea
           className="w-full resize-y rounded border p-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200"
@@ -396,7 +396,7 @@ export default function HomePage() {
         />
       </section>
 
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
+      <section className="rounded-lg border bg-white p-3 shadow-sm sm:p-4">
         {sectionHeader(2, "Paste Claude's answer", "The text you want other models to check.")}
         <textarea
           className="w-full resize-y rounded border p-2 font-mono text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200"
@@ -410,7 +410,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
+      <section className="rounded-lg border bg-white p-3 shadow-sm sm:p-4">
         {sectionHeader(3, "Reference document", "Upload a .docx or .txt — its text is sent along with the answer.")}
         <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 hover:border-blue-300 hover:bg-slate-50">
           <span className="text-base">📄</span>
@@ -457,7 +457,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
+      <section className="rounded-lg border bg-white p-3 shadow-sm sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
@@ -535,8 +535,9 @@ export default function HomePage() {
                         toggleGroup(items);
                       }}
                       onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4"
                     />
-                    <span onClick={() => toggleGroupOpen(group)} className="flex-1">
+                    <span onClick={() => toggleGroupOpen(group)} className="flex-1 py-1">
                       {group}{" "}
                       <span className="font-normal normal-case text-slate-500">
                         ({groupSelected > 0 ? `${groupSelected}/` : ""}
@@ -546,7 +547,7 @@ export default function HomePage() {
                   </label>
                   <button
                     onClick={() => toggleGroupOpen(group)}
-                    className="ml-2 text-xs text-slate-500 hover:text-slate-800"
+                    className="ml-2 flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-slate-800"
                     aria-label={open ? "Collapse" : "Expand"}
                   >
                     {open ? "▾" : "▸"}
@@ -609,8 +610,8 @@ export default function HomePage() {
 
       {/* sticky action bar — fixed at the bottom of the viewport */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-white/95 shadow-lg backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="text-sm">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3">
+          <div className="text-xs sm:text-sm">
             {isRunning ? (
               <span className="text-slate-700">
                 <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-600 align-middle"></span>{" "}
@@ -637,14 +638,14 @@ export default function HomePage() {
                 setResults({});
                 clearDraft();
               }}
-              className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+              className="flex-1 rounded-md border px-3 py-2 text-sm hover:bg-slate-50 sm:flex-none"
             >
               Reset
             </button>
             <button
               onClick={runVerify}
               disabled={isRunning || !claudeAnswer.trim() || selected.length === 0}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="flex-[2] rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400 sm:flex-none"
             >
               {isRunning
                 ? "Working…"
@@ -671,7 +672,7 @@ export default function HomePage() {
           return (
             <div
               key={id}
-              className={`rounded-lg border p-4 shadow-sm ${
+              className={`rounded-lg border p-3 shadow-sm sm:p-4 ${
                 r.status === "ok" ? style.card : "bg-white"
               }`}
             >
@@ -706,7 +707,7 @@ export default function HomePage() {
                 </div>
               )}
               {r.status === "ok" && parsed && (
-                <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
+                <div className="prose prose-sm max-w-none overflow-x-auto break-words prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
                 </div>
               )}

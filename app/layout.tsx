@@ -9,40 +9,54 @@ export const metadata: Metadata = {
   description: "Paste an AI answer, upload a document, and verify with multiple free AI models.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentSession();
   return (
     <html lang="en">
       <body className="min-h-screen">
         <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-sm font-bold text-white">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
+            <Link href="/" className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue-600 text-sm font-bold text-white">
                 LR
               </span>
-              <span className="flex flex-col leading-tight">
-                <span className="text-sm font-semibold">Legal Research Cross-Verifier</span>
-                <span className="text-xs text-slate-500">
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate text-sm font-semibold">
+                  Legal Research <span className="hidden sm:inline">Cross-Verifier</span>
+                </span>
+                <span className="hidden text-xs text-slate-500 sm:inline">
                   Compare AI answers against your source document
                 </span>
               </span>
             </Link>
-            <nav className="flex items-center gap-3 text-sm">
-              <Link href="/" className="text-slate-700 hover:text-slate-900">
+            <nav className="flex shrink-0 items-center gap-1 text-sm sm:gap-3">
+              <Link
+                href="/"
+                className="rounded px-2 py-1 text-slate-700 hover:bg-slate-100"
+              >
                 Verify
               </Link>
-              <Link href="/prompts" className="text-slate-700 hover:text-slate-900">
+              <Link
+                href="/prompts"
+                className="rounded px-2 py-1 text-slate-700 hover:bg-slate-100"
+              >
                 Prompts
               </Link>
               <Link
                 href="/settings"
-                className="rounded-md border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50"
+                className="rounded-md border border-slate-300 px-2 py-1 text-slate-700 hover:bg-slate-50 sm:px-3"
               >
                 Settings
               </Link>
               {session ? (
-                <span className="flex items-center gap-2 border-l pl-3">
-                  <span className="hidden text-xs text-slate-500 sm:inline">
+                <span className="flex items-center gap-2 border-l pl-2 sm:pl-3">
+                  <span className="hidden max-w-[14ch] truncate text-xs text-slate-500 md:inline">
                     {session.email}
                   </span>
                   <SignOutButton />
@@ -50,7 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               ) : (
                 <Link
                   href="/login"
-                  className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1 text-blue-700 hover:bg-blue-100"
+                  className="rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-blue-700 hover:bg-blue-100 sm:px-3"
                 >
                   Sign in
                 </Link>
@@ -58,7 +72,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-6 pb-32">{children}</main>
+        <main className="mx-auto max-w-6xl px-3 py-4 pb-40 sm:px-4 sm:py-6 sm:pb-32">
+          {children}
+        </main>
         <footer className="border-t bg-white">
           <div className="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-500">
             Your API keys are stored only in this browser. The site sends prompts straight to the
