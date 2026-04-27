@@ -12,6 +12,7 @@ import {
   loadDraft,
   loadGroupState,
   loadModelRoles,
+  loadPromptOverrides,
   loadSelectedModels,
   saveDraft,
   saveGroupState,
@@ -24,6 +25,7 @@ import {
   buildPromptForRole,
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
+  type PromptOverrides,
   type VerificationRole,
 } from "@/lib/prompts";
 import { humanizeError } from "@/lib/errors";
@@ -107,6 +109,7 @@ export default function HomePage() {
   const [groupOpen, setGroupOpen] = useState<GroupState>({});
   const [modelFilter, setModelFilter] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const [promptOverrides, setPromptOverrides] = useState<PromptOverrides>({});
 
   useEffect(() => {
     const custom = loadCustomModels();
@@ -115,6 +118,7 @@ export default function HomePage() {
     setSelected(loadSelectedModels());
     setRoles(loadModelRoles());
     setGroupOpen(loadGroupState());
+    setPromptOverrides(loadPromptOverrides());
     const draft = loadDraft();
     if (draft) {
       setUserQuestion(draft.userQuestion);
@@ -302,11 +306,11 @@ export default function HomePage() {
           return;
         }
 
-        const prompt = buildPromptForRole(getRole(id), {
-          claudeAnswer,
-          documentText,
-          userQuestion,
-        });
+        const prompt = buildPromptForRole(
+          getRole(id),
+          { claudeAnswer, documentText, userQuestion },
+          promptOverrides
+        );
 
         if (model.kind === "deep-link") {
           try {

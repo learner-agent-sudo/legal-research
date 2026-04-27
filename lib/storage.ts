@@ -1,5 +1,5 @@
 import type { ModelPreset } from "./presets";
-import type { VerificationRole } from "./prompts";
+import type { PromptOverrides, VerificationRole } from "./prompts";
 
 const KEYS_STORAGE = "lr.apiKeys.v1";
 const CUSTOM_MODELS_STORAGE = "lr.customModels.v1";
@@ -7,6 +7,7 @@ const SELECTED_MODELS_STORAGE = "lr.selectedModels.v1";
 const ROLES_STORAGE = "lr.modelRoles.v1";
 const DRAFT_STORAGE = "lr.draft.v1";
 const GROUP_STATE_STORAGE = "lr.groupState.v1";
+const PROMPT_OVERRIDES_STORAGE = "lr.promptOverrides.v1";
 
 export type ApiKeyMap = Record<string, string>;
 
@@ -116,6 +117,27 @@ export function saveGroupState(state: GroupState) {
   window.localStorage.setItem(GROUP_STATE_STORAGE, JSON.stringify(state));
 }
 
+export function loadPromptOverrides(): PromptOverrides {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(PROMPT_OVERRIDES_STORAGE);
+    return raw ? (JSON.parse(raw) as PromptOverrides) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function savePromptOverrides(overrides: PromptOverrides) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PROMPT_OVERRIDES_STORAGE, JSON.stringify(overrides));
+}
+
+export function clearPromptOverride(role: VerificationRole) {
+  const all = loadPromptOverrides();
+  delete all[role];
+  savePromptOverrides(all);
+}
+
 export type ExportedConfig = {
   version: 1;
   exportedAt: string;
@@ -124,6 +146,7 @@ export type ExportedConfig = {
   selectedModels: string[];
   modelRoles: RoleMap;
   groupState: GroupState;
+  promptOverrides?: PromptOverrides;
 };
 
 export function exportConfig(): ExportedConfig {
@@ -135,6 +158,7 @@ export function exportConfig(): ExportedConfig {
     selectedModels: loadSelectedModels(),
     modelRoles: loadModelRoles(),
     groupState: loadGroupState(),
+    promptOverrides: loadPromptOverrides(),
   };
 }
 
@@ -144,6 +168,7 @@ export type ImportSummary = {
   selectedModels: number;
   modelRoles: number;
   groupState: number;
+  promptOverrides: number;
 };
 
 export function importConfig(raw: unknown): ImportSummary {
@@ -161,6 +186,7 @@ export function importConfig(raw: unknown): ImportSummary {
     selectedModels: 0,
     modelRoles: 0,
     groupState: 0,
+    promptOverrides: 0,
   };
 
   if (cfg.apiKeys && typeof cfg.apiKeys === "object") {
@@ -182,6 +208,10 @@ export function importConfig(raw: unknown): ImportSummary {
   if (cfg.groupState && typeof cfg.groupState === "object") {
     saveGroupState(cfg.groupState);
     summary.groupState = Object.keys(cfg.groupState).length;
+  }
+  if (cfg.promptOverrides && typeof cfg.promptOverrides === "object") {
+    savePromptOverrides(cfg.promptOverrides);
+    summary.promptOverrides = Object.keys(cfg.promptOverrides).length;
   }
   return summary;
 }
