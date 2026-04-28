@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { getCurrentSession } from "@/lib/auth/session";
 import { SignOutButton } from "@/components/SignOutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "Legal Research Cross-Verifier",
@@ -72,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               >
                 Settings
               </Link>
+              <ThemeToggle />
               {session ? (
                 <span className="flex items-center gap-2 border-l border-slate-200 pl-2 dark:border-slate-700 sm:pl-3">
                   <span className="hidden max-w-[14ch] truncate text-xs text-slate-500 dark:text-slate-400 md:inline">
