@@ -12,11 +12,23 @@
 
 html, body {
   @apply bg-slate-50 text-slate-900;
+  font-family: theme('fontFamily.sans');
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .dark html,
 .dark body {
   @apply bg-slate-950 text-slate-100;
+}
+
+/* Apple-style heading rhythm: tighter tracking, slightly heavier */
+h1, h2, h3 {
+  letter-spacing: -0.011em;
+}
+h1 {
+  letter-spacing: -0.022em;
 }
 
 /* Smooth color transitions when toggling theme */
