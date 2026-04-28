@@ -179,17 +179,17 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Settings</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Add or update your free-tier API keys, and define custom OpenAI-compatible models.
         </p>
       </div>
 
       <SyncBanner state={sync} flash={syncFlash} />
 
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-base font-semibold">API keys</h2>
-        <p className="mb-3 text-xs text-slate-600">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">API keys</h2>
+        <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
           Keys are stored only in this browser&apos;s localStorage. They never leave your machine
           except when sent to the chosen provider.
         </p>
@@ -203,7 +203,7 @@ export default function SettingsPage() {
                     href={PROVIDER_SIGNUP_URLS[p]}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs font-normal text-blue-600 hover:underline"
+                    className="text-xs font-normal text-blue-600 hover:underline dark:text-blue-400"
                   >
                     (get a free key)
                   </a>
@@ -213,7 +213,7 @@ export default function SettingsPage() {
                 type="password"
                 value={keys[p] ?? ""}
                 onChange={(e) => setKeys({ ...keys, [p]: e.target.value })}
-                className="mt-1 w-full rounded border p-2 font-mono text-sm"
+                className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
                 placeholder={`Paste your ${p} key`}
               />
             </div>
@@ -222,17 +222,17 @@ export default function SettingsPage() {
         <div className="mt-3 flex items-center gap-3">
           <button
             onClick={handleSaveKeys}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400"
           >
             Save keys
           </button>
-          {savedFlash && <span className="text-xs text-green-600">Saved.</span>}
+          {savedFlash && <span className="text-xs text-green-600 dark:text-green-400">Saved.</span>}
         </div>
       </section>
 
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold">Move keys to another computer</h2>
-        <p className="mt-1 text-sm text-slate-600">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Move keys to another computer</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Export everything (keys + custom models + selections) into a single JSON file, then
           import it on another browser or computer. Useful when you want to use the site from
           a second machine without re-typing keys.
@@ -240,11 +240,11 @@ export default function SettingsPage() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             onClick={handleExport}
-            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
           >
             Export to file
           </button>
-          <label className="cursor-pointer rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50">
+          <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
             Import from file
             <input
               type="file"
@@ -255,66 +255,67 @@ export default function SettingsPage() {
           </label>
         </div>
         {ioMessage && (
-          <p className="mt-3 rounded bg-green-50 p-2 text-xs text-green-800">{ioMessage}</p>
+          <p className="mt-3 rounded bg-green-50 p-2 text-xs text-green-800 dark:bg-green-950/40 dark:text-green-300">{ioMessage}</p>
         )}
         {ioError && (
-          <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-800">{ioError}</p>
+          <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-800 dark:bg-red-950/40 dark:text-red-300">{ioError}</p>
         )}
-        <p className="mt-3 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
+        <p className="mt-3 rounded bg-yellow-50 p-2 text-xs text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300">
           ⚠ The exported file contains your API keys in <strong>plain text</strong>. Save it
           somewhere private (e.g. a password manager attachment), and don&apos;t email or
           message it.
         </p>
       </section>
 
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-1 text-base font-semibold">Add a custom model</h2>
-        <p className="mb-3 text-xs text-slate-600">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Add a custom model</h2>
+        <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
           For any provider that uses an OpenAI-compatible API. Examples below.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium">Display label</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Display label</label>
             <input
-              className="mt-1 w-full rounded border p-2 text-sm"
+              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="e.g. DeepSeek V3 (direct)"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Provider name</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Provider name</label>
             <input
-              className="mt-1 w-full rounded border p-2 text-sm"
+              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="e.g. deepseek"
               value={form.provider}
               onChange={(e) => setForm({ ...form, provider: e.target.value })}
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Base URL</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Base URL</label>
             <input
-              className="mt-1 w-full rounded border p-2 font-mono text-sm"
+              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="https://api.deepseek.com/v1"
               value={form.baseUrl}
               onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Model ID</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Model ID</label>
             <input
-              className="mt-1 w-full rounded border p-2 font-mono text-sm"
+              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="deepseek-chat"
               value={form.modelId}
               onChange={(e) => setForm({ ...form, modelId: e.target.value })}
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="text-sm font-medium">API key (optional, saved for this provider)</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">API key (optional, saved for this provider)</label>
             <input
               type="password"
-              className="mt-1 w-full rounded border p-2 font-mono text-sm"
+              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              autoComplete="off"
               value={form.apiKey}
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
             />
@@ -322,12 +323,12 @@ export default function SettingsPage() {
         </div>
         <button
           onClick={handleAddCustom}
-          className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="mt-3 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400"
         >
           Add custom model
         </button>
 
-        <details className="mt-4 text-xs text-slate-600">
+        <details className="mt-4 text-xs text-slate-600 dark:text-slate-400">
           <summary className="cursor-pointer">Examples of OpenAI-compatible providers</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>DeepSeek direct — base URL <code>https://api.deepseek.com/v1</code>, model <code>deepseek-chat</code></li>
@@ -339,23 +340,23 @@ export default function SettingsPage() {
       </section>
 
       {custom.length > 0 && (
-        <section className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold">Your custom models</h2>
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Your custom models</h2>
           <ul className="space-y-2">
             {custom.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded border p-2 text-sm"
+                className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm dark:border-slate-700"
               >
                 <span>
                   <span className="font-medium">{m.label}</span>{" "}
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     ({m.provider} · {m.modelId})
                   </span>
                 </span>
                 <button
                   onClick={() => handleRemoveCustom(m.id)}
-                  className="text-xs text-red-600 hover:underline"
+                  className="text-xs text-red-600 hover:underline dark:text-red-400"
                 >
                   Remove
                 </button>
@@ -371,19 +372,19 @@ export default function SettingsPage() {
 function SyncBanner({ state, flash }: { state: SyncState; flash: string }) {
   if (state.status === "checking") {
     return (
-      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
         Checking sync status…
       </div>
     );
   }
   if (state.status === "signed-in") {
     return (
-      <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800">
+      <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-900/50 dark:bg-green-950/40 dark:text-green-300">
         ✓ Signed in. Your keys, custom models, prompt edits, and role assignments
         sync to your account on every save.
         {flash && <span className="ml-2 font-medium">{flash}</span>}
         {state.lastSyncedAt && !flash && (
-          <span className="ml-2 text-slate-500">
+          <span className="ml-2 text-slate-500 dark:text-slate-400">
             Last synced {new Date(state.lastSyncedAt).toLocaleString()}.
           </span>
         )}
@@ -392,7 +393,7 @@ function SyncBanner({ state, flash }: { state: SyncState; flash: string }) {
   }
   if (state.status === "signed-out") {
     return (
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
         ⓘ Not signed in. Settings are saved only in this browser.{" "}
         <a href="/login" className="font-medium underline">
           Sign in
@@ -403,7 +404,7 @@ function SyncBanner({ state, flash }: { state: SyncState; flash: string }) {
   }
   if (state.status === "error") {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+      <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
         Sync error: {state.message}
       </div>
     );
