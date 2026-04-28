@@ -67,26 +67,26 @@ function parseVerdict(text: string): { verdict: Verdict; body: string } {
 
 const VERDICT_STYLES: Record<Verdict, { card: string; chip: string; chipText: string; emoji: string }> = {
   green: {
-    card: "border-green-300 bg-green-50",
-    chip: "bg-green-200",
+    card: "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30",
+    chip: "bg-emerald-200 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200",
     chipText: "Looks correct",
     emoji: "✓",
   },
   yellow: {
-    card: "border-yellow-300 bg-yellow-50",
-    chip: "bg-yellow-200",
+    card: "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
+    chip: "bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200",
     chipText: "Some concerns",
     emoji: "!",
   },
   red: {
-    card: "border-red-300 bg-red-50",
-    chip: "bg-red-200",
+    card: "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/30",
+    chip: "bg-rose-200 text-rose-900 dark:bg-rose-900/60 dark:text-rose-200",
     chipText: "Major issues",
     emoji: "✗",
   },
   none: {
-    card: "bg-white",
-    chip: "bg-slate-200",
+    card: "bg-white dark:bg-slate-900",
+    chip: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
     chipText: "No verdict tag",
     emoji: "?",
   },
@@ -704,14 +704,14 @@ export default function HomePage() {
           return (
             <div
               key={id}
-              className={`rounded-lg border p-3 shadow-sm sm:p-4 ${
-                r.status === "ok" ? style.card : "bg-white"
+              className={`rounded-lg border border-slate-200 p-3 shadow-sm dark:border-slate-800 sm:p-4 ${
+                r.status === "ok" ? style.card : "bg-white dark:bg-slate-900"
               }`}
             >
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="font-semibold">{model.label}</h3>
-                  <p className="text-xs text-slate-500">Role: {ROLE_LABELS[getRole(id)]}</p>
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">{model.label}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Role: {ROLE_LABELS[getRole(id)]}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {parsed && parsed.verdict !== "none" && (
@@ -724,7 +724,7 @@ export default function HomePage() {
                   {r.status === "ok" && (
                     <button
                       onClick={() => navigator.clipboard.writeText(r.text)}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                     >
                       Copy
                     </button>
@@ -733,26 +733,26 @@ export default function HomePage() {
               </div>
               {r.status === "loading" && (
                 <div className="space-y-2">
-                  <div className="h-3 animate-pulse rounded bg-slate-200" />
-                  <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200" />
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </div>
               )}
               {r.status === "ok" && parsed && (
-                <div className="prose prose-sm max-w-none overflow-x-auto break-words prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto">
+                <div className="prose prose-sm max-w-none overflow-x-auto break-words dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
                 </div>
               )}
               {r.status === "deeplink" && (
                 <div className="text-sm">
-                  <p className="mb-2 text-slate-700">
+                  <p className="mb-2 text-slate-700 dark:text-slate-300">
                     Prompt copied to clipboard. Open the site and paste:
                   </p>
                   <a
                     href={r.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700"
+                    className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
                   >
                     Open {model.label}
                   </a>
@@ -761,14 +761,14 @@ export default function HomePage() {
               {r.status === "error" && (() => {
                 const e = humanizeError(r.error, model.label);
                 return (
-                  <div className="rounded border border-red-200 bg-red-50 p-3 text-sm">
-                    <p className="font-medium text-red-800">{e.title}</p>
-                    <p className="mt-1 whitespace-pre-line text-red-700">{e.hint}</p>
+                  <div className="rounded border border-rose-200 bg-rose-50 p-3 text-sm dark:border-rose-900/50 dark:bg-rose-950/30">
+                    <p className="font-medium text-rose-800 dark:text-rose-300">{e.title}</p>
+                    <p className="mt-1 whitespace-pre-line text-rose-700 dark:text-rose-300/90">{e.hint}</p>
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-red-600">
+                      <summary className="cursor-pointer text-xs text-rose-600 dark:text-rose-400">
                         Technical details
                       </summary>
-                      <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-red-900">
+                      <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-rose-900 dark:text-rose-200/90">
                         {e.raw}
                       </pre>
                     </details>
@@ -783,21 +783,21 @@ export default function HomePage() {
 
         return (
           <section className="space-y-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-800">
               <div className="flex items-baseline gap-2">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
                   5
                 </span>
-                <h2 className="text-base font-semibold">Results</h2>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Results</h2>
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {okCount} success · {errorIds.length} failed · {orderedIds.length} total
               </p>
             </div>
             {successIds.map(renderCard)}
             {errorIds.length > 0 && (
-              <details className="rounded-lg border bg-slate-50 p-3 text-sm">
-                <summary className="cursor-pointer font-medium text-slate-700">
+              <details className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-300">
                   {errorIds.length} model{errorIds.length === 1 ? "" : "s"} failed (click to expand)
                 </summary>
                 <div className="mt-3 space-y-3">{errorIds.map(renderCard)}</div>
