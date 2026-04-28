@@ -18,6 +18,7 @@ import {
 import {
   pullFromServer,
   pushSnapshot,
+  smartSync,
   writeLocalSnapshot,
 } from "@/lib/sync";
 
@@ -57,7 +58,7 @@ export default function SettingsPage() {
 
   async function initialSync() {
     setSync({ status: "checking" });
-    const res = await pullFromServer();
+    const res = await smartSync();
     if (!res.ok) {
       if (res.reason === "not-signed-in") {
         setSync({ status: "signed-out" });
@@ -68,12 +69,17 @@ export default function SettingsPage() {
       }
       return;
     }
-    if (res.data && Object.keys(res.data).length > 0) {
-      writeLocalSnapshot(res.data);
-      setKeys(res.data.apiKeys ?? {});
-      if (res.data.customModels) setCustom(res.data.customModels);
-    }
+    // Refresh in-page state from whatever localStorage now holds
+    setKeys(loadApiKeys());
+    setCustom(loadCustomModels());
     setSync({ status: "signed-in", lastSyncedAt: res.data?.updatedAt });
+    if (res.action === "migrated") {
+      setSyncFlash("Uploaded your existing local keys to your account");
+      setTimeout(() => setSyncFlash(""), 3000);
+    } else if (res.action === "pulled") {
+      setSyncFlash("Pulled your saved settings from your account");
+      setTimeout(() => setSyncFlash(""), 3000);
+    }
   }
 
   async function pushIfSignedIn() {

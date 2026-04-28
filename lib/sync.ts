@@ -88,3 +88,49 @@ export async function pushToServer(data: SyncableData): Promise<SyncResult> {
 export async function pushSnapshot(): Promise<SyncResult> {
   return await pushToServer(readLocalSnapshot());
 }
+
+function hasMeaningfulLocalData(d: SyncableData): boolean {
+  return Boolean(
+    (d.apiKeys && Object.keys(d.apiKeys).length > 0) ||
+      (d.customModels && d.customModels.length > 0) ||
+      (d.promptOverrides && Object.keys(d.promptOverrides).length > 0) ||
+      (d.modelRoles && Object.keys(d.modelRoles).length > 0)
+  );
+}
+
+export type SmartSyncOutcome =
+  | { ok: true; action: "pulled" | "migrated" | "noop"; data?: SyncableData }
+  | {
+      ok: false;
+      reason: "not-signed-in" | "not-configured" | "network" | "error";
+      message?: string;
+    };
+
+/**
+ * Pull from server. If the server has data, write it to localStorage. If the
+ * server is empty BUT localStorage has data, push localStorage up — useful
+ * for the first login from a device that's been used while signed out.
+ */
+export async function smartSync(): Promise<SmartSyncOutcome> {
+  const pull = await pullFromServer();
+  if (!pull.ok) {
+    return { ok: false, reason: pull.reason, message: pull.message };
+  }
+
+  const serverHasData = pull.data && Object.keys(pull.data).length > 0;
+  if (serverHasData) {
+    writeLocalSnapshot(pull.data!);
+    return { ok: true, action: "pulled", data: pull.data };
+  }
+
+  const local = readLocalSnapshot();
+  if (hasMeaningfulLocalData(local)) {
+    const push = await pushToServer(local);
+    if (!push.ok) {
+      return { ok: false, reason: push.reason, message: push.message };
+    }
+    return { ok: true, action: "migrated" };
+  }
+
+  return { ok: true, action: "noop" };
+}
