@@ -6,6 +6,24 @@
   color-scheme: light;
 }
 
-body {
+.dark {
+  color-scheme: dark;
+}
+
+html, body {
   @apply bg-slate-50 text-slate-900;
+}
+
+.dark html,
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+/* Smooth color transitions when toggling theme */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition-delay: 0ms;
 }
