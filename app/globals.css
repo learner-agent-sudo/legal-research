@@ -39,3 +39,39 @@ html.theme-transition *::after {
   transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
   transition-delay: 0ms;
 }
+
+/* Subtle universal transitions — Apple-style 150ms ease-out on
+ * interactive surfaces. Buttons get a gentle press effect.
+ * Respect users who request reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  details > summary,
+  label[role="button"],
+  label.cursor-pointer {
+    transition: background-color 150ms ease-out, border-color 150ms ease-out,
+      color 150ms ease-out, box-shadow 150ms ease-out, transform 100ms ease-out,
+      opacity 150ms ease-out;
+  }
+
+  button:not(:disabled):active,
+  a:active,
+  label.cursor-pointer:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Make focus rings consistent and unobtrusive — Apple uses thin
+ * blue rings only on keyboard focus, not on click. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid rgb(59 130 246 / 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.dark :focus-visible {
+  outline-color: rgb(96 165 250 / 0.7);
+}
