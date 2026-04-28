@@ -143,7 +143,7 @@ export default function PromptsPage() {
           const customized = isCustomized(role);
           const dirty = isDirty(role);
           return (
-            <section key={role} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <section key={role} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -162,7 +162,7 @@ export default function PromptsPage() {
                 value={drafts[role] ?? ""}
                 onChange={(e) => handleChange(role, e.target.value)}
                 rows={Math.min(20, (drafts[role] ?? "").split("\n").length + 1)}
-                className="mt-2 w-full resize-y rounded border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-500 dark:focus:bg-slate-950 dark:focus:ring-blue-900/40"
+                className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-500 dark:focus:bg-slate-950 dark:focus:ring-blue-900/40"
               />
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button

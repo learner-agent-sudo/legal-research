@@ -189,7 +189,7 @@ export default function SettingsPage() {
 
       <SyncBanner state={sync} flash={syncFlash} />
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">API keys</h2>
         <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
           Keys are stored only in this browser&apos;s localStorage. They never leave your machine
@@ -215,7 +215,7 @@ export default function SettingsPage() {
                 type="password"
                 value={keys[p] ?? ""}
                 onChange={(e) => setKeys({ ...keys, [p]: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
                 placeholder={`Paste your ${p} key`}
               />
             </div>
@@ -232,7 +232,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Move keys to another computer</h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           Export everything (keys + custom models + selections) into a single JSON file, then
@@ -269,7 +269,7 @@ export default function SettingsPage() {
         </p>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Add a custom model</h2>
         <p className="mb-3 text-xs text-slate-600 dark:text-slate-400">
           For any provider that uses an OpenAI-compatible API. Examples below.
@@ -279,7 +279,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Display label</label>
             <input
-              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="e.g. DeepSeek V3 (direct)"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
@@ -288,7 +288,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Provider name</label>
             <input
-              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="e.g. deepseek"
               value={form.provider}
               onChange={(e) => setForm({ ...form, provider: e.target.value })}
@@ -297,7 +297,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Base URL</label>
             <input
-              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="https://api.deepseek.com/v1"
               value={form.baseUrl}
               onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
@@ -306,7 +306,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Model ID</label>
             <input
-              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               placeholder="deepseek-chat"
               value={form.modelId}
               onChange={(e) => setForm({ ...form, modelId: e.target.value })}
@@ -316,7 +316,7 @@ export default function SettingsPage() {
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">API key (optional, saved for this provider)</label>
             <input
               type="password"
-              className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
               autoComplete="off"
               value={form.apiKey}
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
@@ -342,7 +342,7 @@ export default function SettingsPage() {
       </section>
 
       {custom.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Your custom models</h2>
           <ul className="space-y-2">
             {custom.map((m) => (

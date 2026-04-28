@@ -38,7 +38,7 @@ export default function LoginPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+        className="mt-6 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
       >
         <label className="block">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
@@ -48,7 +48,7 @@ export default function LoginPage() {
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
             placeholder="you@example.com"
           />
         </label>

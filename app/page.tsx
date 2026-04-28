@@ -417,10 +417,10 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         {sectionHeader(1, "Your question", "Optional — gives the AI context for what was asked.")}
         <textarea
-          className="w-full resize-y rounded border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+          className="w-full resize-y rounded-lg border border-slate-300 bg-white p-2 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
           rows={2}
           placeholder="What was the original legal question you asked Claude?"
           value={userQuestion}
@@ -428,10 +428,10 @@ export default function HomePage() {
         />
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         {sectionHeader(2, "Paste Claude's answer", "The text you want other models to check.")}
         <textarea
-          className="w-full resize-y rounded border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+          className="w-full resize-y rounded-lg border border-slate-300 bg-white p-2 font-mono text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
           rows={8}
           placeholder="Paste the answer you want verified..."
           value={claudeAnswer}
@@ -442,7 +442,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         {sectionHeader(3, "Reference document", "Upload a .docx or .txt — its text is sent along with the answer.")}
         <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 hover:border-blue-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:border-blue-700 dark:hover:bg-slate-800/50">
           <span className="text-base">📄</span>
@@ -489,7 +489,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
@@ -523,7 +523,7 @@ export default function HomePage() {
             placeholder="Search models (name or ID)…"
             value={modelFilter}
             onChange={(e) => setModelFilter(e.target.value)}
-            className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-200 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
           />
           {modelFilter && (
             <button
@@ -708,7 +708,7 @@ export default function HomePage() {
           return (
             <div
               key={id}
-              className={`rounded-lg border border-slate-200 p-3 shadow-sm dark:border-slate-800 sm:p-4 ${
+              className={`rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-800 sm:p-4 ${
                 r.status === "ok" ? style.card : "bg-white dark:bg-slate-900"
               }`}
             >
@@ -800,7 +800,7 @@ export default function HomePage() {
             </div>
             {successIds.map(renderCard)}
             {errorIds.length > 0 && (
-              <details className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+              <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
                 <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-300">
                   {errorIds.length} model{errorIds.length === 1 ? "" : "s"} failed (click to expand)
                 </summary>
