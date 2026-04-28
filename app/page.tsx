@@ -30,6 +30,7 @@ import {
 } from "@/lib/prompts";
 import { humanizeError } from "@/lib/errors";
 import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
+import { useToast } from "@/components/Toast";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -93,6 +94,7 @@ const VERDICT_STYLES: Record<Verdict, { card: string; chip: string; chipText: st
 };
 
 export default function HomePage() {
+  const toast = useToast();
   const [userQuestion, setUserQuestion] = useState("");
   const [claudeAnswer, setClaudeAnswer] = useState("");
   const [documentText, setDocumentText] = useState("");
@@ -316,11 +318,11 @@ export default function HomePage() {
 
   async function runVerify() {
     if (!claudeAnswer.trim()) {
-      alert("Paste Claude's answer first.");
+      toast.show("warn", "Paste Claude's answer first.");
       return;
     }
     if (selected.length === 0) {
-      alert("Select at least one model.");
+      toast.show("warn", "Select at least one model.");
       return;
     }
 
@@ -661,14 +663,16 @@ export default function HomePage() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => {
-                if (!confirm("Clear all inputs and results?")) return;
+              onClick={async () => {
+                const ok = await toast.confirm("Clear all inputs and results?");
+                if (!ok) return;
                 setClaudeAnswer("");
                 setUserQuestion("");
                 setDocumentText("");
                 setDocFileName("");
                 setResults({});
                 clearDraft();
+                toast.show("success", "Cleared");
               }}
               className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 sm:flex-none"
             >

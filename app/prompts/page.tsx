@@ -16,6 +16,7 @@ import {
   savePromptOverrides,
 } from "@/lib/storage";
 import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
+import { useToast } from "@/components/Toast";
 
 const ROLES: VerificationRole[] = [
   "comprehensive",
@@ -26,6 +27,7 @@ const ROLES: VerificationRole[] = [
 ];
 
 export default function PromptsPage() {
+  const toast = useToast();
   const [overrides, setOverrides] = useState<PromptOverrides>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [hydrated, setHydrated] = useState(false);
@@ -91,8 +93,9 @@ export default function PromptsPage() {
     void pushIfSignedIn();
   }
 
-  function handleReset(role: VerificationRole) {
-    if (!confirm(`Reset "${ROLE_LABELS[role]}" to the built-in default?`)) return;
+  async function handleReset(role: VerificationRole) {
+    const ok = await toast.confirm(`Reset "${ROLE_LABELS[role]}" to the built-in default?`);
+    if (!ok) return;
     clearPromptOverride(role);
     const next = { ...overrides };
     delete next[role];

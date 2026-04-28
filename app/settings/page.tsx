@@ -21,6 +21,7 @@ import {
   smartSync,
   writeLocalSnapshot,
 } from "@/lib/sync";
+import { useToast } from "@/components/Toast";
 
 const KNOWN_PROVIDERS = ["groq", "openrouter", "gemini", "mistral"];
 
@@ -32,6 +33,7 @@ type SyncState =
   | { status: "error"; message: string };
 
 export default function SettingsPage() {
+  const toast = useToast();
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [custom, setCustom] = useState<ModelPreset[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -105,7 +107,7 @@ export default function SettingsPage() {
 
   function handleAddCustom() {
     if (!form.label || !form.baseUrl || !form.modelId || !form.provider) {
-      alert("Label, provider, base URL, and model ID are required.");
+      toast.show("warn", "Label, provider, base URL, and model ID are required.");
       return;
     }
     const id = `custom-${form.provider}-${form.modelId}-${Date.now()}`;

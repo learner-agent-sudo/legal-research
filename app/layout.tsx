@@ -4,6 +4,7 @@ import "./globals.css";
 import { getCurrentSession } from "@/lib/auth/session";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ToastProvider } from "@/components/Toast";
 
 export const metadata: Metadata = {
   title: "Legal Research Cross-Verifier",
@@ -39,7 +40,29 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="min-h-screen">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
+        <ToastProvider>
+          <Header session={session} />
+          <main className="mx-auto max-w-6xl px-3 py-4 pb-40 sm:px-4 sm:py-6 sm:pb-32">
+            {children}
+          </main>
+          <footer className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div className="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-500 dark:text-slate-400">
+              Your API keys are stored only in this browser. The site sends prompts straight to the
+              provider you pick — no central database.
+            </div>
+          </footer>
+        </ToastProvider>
+      </body>
+    </html>
+  );
+}
+
+type SessionInfo = { email: string } | null;
+
+function Header({ session }: { session: SessionInfo }) {
+  return (
+    <>
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4">
             <Link href="/" className="flex min-w-0 items-center gap-2">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue-600 text-sm font-bold text-white dark:bg-blue-500">
@@ -92,16 +115,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </nav>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-3 py-4 pb-40 sm:px-4 sm:py-6 sm:pb-32">
-          {children}
-        </main>
-        <footer className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-          <div className="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-500 dark:text-slate-400">
-            Your API keys are stored only in this browser. The site sends prompts straight to the
-            provider you pick — no central database.
-          </div>
-        </footer>
-      </body>
-    </html>
+    </>
   );
 }
