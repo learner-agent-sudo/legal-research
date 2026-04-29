@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   PROVIDER_KEY_NAMES,
   PROVIDER_SIGNUP_URLS,
@@ -21,6 +22,7 @@ import {
   smartSync,
   writeLocalSnapshot,
 } from "@/lib/sync";
+import { clearHistory, listSessions } from "@/lib/history";
 import { useToast } from "@/components/Toast";
 
 const KNOWN_PROVIDERS = ["groq", "openrouter", "gemini", "mistral"];
@@ -41,6 +43,7 @@ export default function SettingsPage() {
   const [ioError, setIoError] = useState<string>("");
   const [sync, setSync] = useState<SyncState>({ status: "idle" });
   const [syncFlash, setSyncFlash] = useState<string>("");
+  const [historyCount, setHistoryCount] = useState<number | null>(null);
 
   // form state for adding a custom model
   const [form, setForm] = useState({
@@ -55,6 +58,7 @@ export default function SettingsPage() {
     setKeys(loadApiKeys());
     setCustom(loadCustomModels());
     void initialSync();
+    void listSessions().then((r) => { if (r.ok) setHistoryCount(r.sessions.length); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -365,6 +369,42 @@ export default function SettingsPage() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {sync.status === "signed-in" && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="mb-1 text-base font-semibold text-slate-900 dark:text-slate-100">Verification history</h2>
+          {historyCount !== null && (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {historyCount} saved {historyCount === 1 ? "run" : "runs"} (max 50).{" "}
+              <Link href="/history" className="text-blue-600 hover:underline dark:text-blue-400">
+                Browse →
+              </Link>
+            </p>
+          )}
+          <p className="mt-2 rounded bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-800/50 dark:text-slate-400">
+            Sessions include the legal documents you uploaded. They are stored to your account on
+            Upstash and visible from any device signed in with this email. Delete entries
+            individually on the{" "}
+            <Link href="/history" className="text-blue-600 hover:underline dark:text-blue-400">
+              History page
+            </Link>
+            , or clear all below.
+          </p>
+          <button
+            onClick={async () => {
+              const ok = await toast.confirm("Delete all history entries? This cannot be undone.");
+              if (!ok) return;
+              const res = await clearHistory();
+              if (!res.ok) { toast.show("error", "Could not clear history."); return; }
+              setHistoryCount(0);
+              toast.show("success", `Cleared ${res.deleted} ${res.deleted === 1 ? "entry" : "entries"}.`);
+            }}
+            className="mt-3 rounded-md border border-rose-300 px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/30"
+          >
+            Clear all history
+          </button>
         </section>
       )}
     </div>
