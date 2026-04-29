@@ -30,6 +30,7 @@ import {
 } from "@/lib/prompts";
 import { humanizeError } from "@/lib/errors";
 import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
+import { saveSession, type Session } from "@/lib/history";
 import { useToast } from "@/components/Toast";
 
 const ROLE_OPTIONS: VerificationRole[] = [
@@ -330,6 +331,9 @@ export default function HomePage() {
     selected.forEach((id) => (initial[id] = { status: "loading" }));
     setResults(initial);
 
+    // Capture rendered prompts so they can be stored in the session snapshot
+    const promptsUsed: Record<string, string> = {};
+
     await Promise.all(
       selected.map(async (id) => {
         const model = allModels.find((m) => m.id === id);
@@ -343,6 +347,7 @@ export default function HomePage() {
           { claudeAnswer, documentText, userQuestion },
           promptOverrides
         );
+        promptsUsed[id] = prompt;
 
         if (model.kind === "deep-link") {
           try {
@@ -392,6 +397,83 @@ export default function HomePage() {
         }
       })
     );
+
+    // Auto-save to history if signed in and at least one successful result
+    if (signedIn) {
+      setResults((finalResults) => {
+        const hasSuccess = Object.values(finalResults).some(
+          (r) => r.status === "ok" || r.status === "deeplink"
+        );
+        if (!hasSuccess) return finalResults;
+
+        const sessionPayload: Omit<Session, "id" | "createdAt"> = {
+          userQuestion,
+          claudeAnswer,
+          documentText,
+          documentFilename: docFileName,
+          selectedModels: selected
+            .map((id) => {
+              const model = allModels.find((m) => m.id === id);
+              if (!model) return null;
+              return {
+                id,
+                label: model.label,
+                role: getRole(id),
+                promptUsed: promptsUsed[id] ?? "",
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null),
+          results: selected
+            .map((id) => {
+              const r = finalResults[id];
+              const model = allModels.find((m) => m.id === id);
+              if (!r || !model) return null;
+              if (r.status === "ok") {
+                const { verdict } = parseVerdict(r.text);
+                return {
+                  modelId: id,
+                  modelLabel: model.label,
+                  role: getRole(id),
+                  status: "ok" as const,
+                  text: r.text,
+                  verdict,
+                };
+              }
+              if (r.status === "deeplink") {
+                return {
+                  modelId: id,
+                  modelLabel: model.label,
+                  role: getRole(id),
+                  status: "deeplink" as const,
+                };
+              }
+              if (r.status === "error") {
+                return {
+                  modelId: id,
+                  modelLabel: model.label,
+                  role: getRole(id),
+                  status: "error" as const,
+                  error: r.error,
+                };
+              }
+              return null;
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null),
+        };
+
+        void saveSession(sessionPayload).then((res) => {
+          if (res.ok) {
+            toast.show("success", "Saved to history.");
+          } else if (res.reason === "too-large") {
+            toast.show("warn", "Run too large to save to history (over 500 KB).");
+          } else if (res.reason !== "not-signed-in" && res.reason !== "not-configured") {
+            toast.show("error", "Could not save to history.");
+          }
+        });
+
+        return finalResults;
+      });
+    }
   }
 
   const totalToRun = selected.length;
