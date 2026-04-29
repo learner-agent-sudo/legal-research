@@ -90,6 +90,14 @@ function Header({ session }: { session: SessionInfo }) {
               >
                 Prompts
               </Link>
+              {session && (
+                <Link
+                  href="/history"
+                  className="rounded px-2 py-1 text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  History
+                </Link>
+              )}
               <Link
                 href="/settings"
                 className="rounded-md border border-slate-300 px-2 py-1 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 sm:px-3"
