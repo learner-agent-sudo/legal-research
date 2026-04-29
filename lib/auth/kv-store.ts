@@ -113,3 +113,120 @@ export async function setUserData(email: string, data: UserDataBlob): Promise<vo
     updatedAt: new Date().toISOString(),
   });
 }
+
+// ---------- History storage ----------
+
+export type SessionModelSnapshot = {
+  id: string;
+  label: string;
+  role: string;
+  promptUsed: string;
+};
+
+export type SessionResult = {
+  modelId: string;
+  modelLabel: string;
+  role: string;
+  status: "ok" | "error" | "deeplink";
+  text?: string;
+  verdict?: "green" | "yellow" | "red" | "none";
+  error?: string;
+};
+
+export type Session = {
+  id: string;
+  createdAt: string;
+  userQuestion: string;
+  claudeAnswer: string;
+  documentText: string;
+  documentFilename: string;
+  documentTruncated?: boolean;
+  selectedModels: SessionModelSnapshot[];
+  results: SessionResult[];
+};
+
+export type SessionSummary = {
+  id: string;
+  createdAt: string;
+  questionPreview: string;
+  modelCount: number;
+  verdictCounts: { green: number; yellow: number; red: number; none: number };
+};
+
+const HISTORY_CAP = 50;
+const SESSION_DOC_MAX = 30_000;
+
+export async function getHistoryIndex(email: string): Promise<SessionSummary[]> {
+  return (await client().get<SessionSummary[]>(`user:${emailKey(email)}:history-index`)) ?? [];
+}
+
+export async function setHistoryIndex(email: string, list: SessionSummary[]): Promise<void> {
+  await client().set(`user:${emailKey(email)}:history-index`, list);
+}
+
+export async function getSession(email: string, id: string): Promise<Session | null> {
+  return await client().get<Session>(`user:${emailKey(email)}:session:${id}`);
+}
+
+export async function setSession(email: string, session: Session): Promise<void> {
+  await client().set(`user:${emailKey(email)}:session:${session.id}`, session);
+}
+
+export async function deleteSessionById(email: string, id: string): Promise<void> {
+  const r = client();
+  await r.del(`user:${emailKey(email)}:session:${id}`);
+  const index = await getHistoryIndex(email);
+  await setHistoryIndex(email, index.filter((s) => s.id !== id));
+}
+
+export async function deleteAllSessions(email: string): Promise<number> {
+  const index = await getHistoryIndex(email);
+  const r = client();
+  await Promise.all(index.map((s) => r.del(`user:${emailKey(email)}:session:${s.id}`)));
+  await r.del(`user:${emailKey(email)}:history-index`);
+  return index.length;
+}
+
+export async function appendSession(
+  email: string,
+  session: Omit<Session, "id" | "createdAt">
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+
+  let documentText = session.documentText;
+  let documentTruncated = false;
+  if (documentText.length > SESSION_DOC_MAX) {
+    documentText = documentText.slice(0, SESSION_DOC_MAX);
+    documentTruncated = true;
+  }
+
+  const full: Session = { ...session, id, createdAt, documentText, documentTruncated };
+
+  const verdictCounts = { green: 0, yellow: 0, red: 0, none: 0 };
+  for (const r of full.results) {
+    const v = (r.verdict ?? "none") as keyof typeof verdictCounts;
+    verdictCounts[v] = (verdictCounts[v] ?? 0) + 1;
+  }
+
+  const summary: SessionSummary = {
+    id,
+    createdAt,
+    questionPreview: (full.userQuestion || full.claudeAnswer).slice(0, 120),
+    modelCount: full.selectedModels.length,
+    verdictCounts,
+  };
+
+  await setSession(email, full);
+
+  let index = await getHistoryIndex(email);
+  index = [summary, ...index];
+  if (index.length > HISTORY_CAP) {
+    const evicted = index.splice(HISTORY_CAP);
+    const r = client();
+    await Promise.all(evicted.map((s) => r.del(`user:${emailKey(email)}:session:${s.id}`)));
+  }
+  await setHistoryIndex(email, index);
+
+  return id;
+}
