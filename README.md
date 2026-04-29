@@ -47,18 +47,37 @@ If you prefer keys server-side instead, set `GROQ_API_KEY`, `OPENROUTER_API_KEY`
 | Google Gemini | <https://aistudio.google.com/apikey> |
 | Mistral | <https://console.mistral.ai/api-keys/> |
 
+## Verification history
+
+When signed in, every Verify run is automatically saved to your account. Visit **/history** to:
+
+- Browse past runs across devices
+- See the question, Claude's answer, the attached document, and every AI response
+- **Restore** a past run back to the editor with one click
+- **Delete** individual entries or clear all
+
+**Caps**: 50 sessions per account (oldest evicted when the 51st arrives). Sessions larger than 500 KB are skipped with a toast. Documents are stored up to 30 KB (already truncated before the AI call anyway).
+
+**Privacy**: sessions include the legal text you uploaded. They are stored in your Upstash Redis instance behind your email login — not accessible to anyone else. Delete entries from the History page or use *Clear all history* in Settings.
+
+History requires an Upstash Redis connection (`KV_REST_API_URL` / `KV_REST_API_TOKEN` env vars). Without it, history is silently disabled and everything else still works.
+
 ## Project structure
 
 ```
 app/
-  page.tsx              # main verifier UI
-  settings/page.tsx     # API key + custom-model management
-  api/chat/route.ts     # forwards prompts to the chosen provider
-  api/parse-docx/route.ts # extracts text from uploaded .docx files
+  page.tsx                    # main verifier UI (auto-saves runs to history)
+  history/page.tsx            # verification history browser
+  settings/page.tsx           # API key + custom-model management
+  api/chat/route.ts           # forwards prompts to the chosen provider
+  api/parse-docx/route.ts     # extracts text from uploaded .docx files
+  api/user/history/route.ts           # GET list, POST save, DELETE clear-all
+  api/user/history/[id]/route.ts      # GET one session, DELETE one session
 lib/
   presets.ts            # built-in model list
   prompts.ts            # verification prompt template
   storage.ts            # localStorage helpers
+  history.ts            # client helpers: saveSession, listSessions, etc.
   adapters/
     openai-compat.ts    # Groq, OpenRouter, DeepSeek, Qwen, custom
     gemini.ts           # Google Gemini
