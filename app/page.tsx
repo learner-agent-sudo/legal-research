@@ -31,7 +31,8 @@ import {
 } from "@/lib/prompts";
 import { humanizeError } from "@/lib/errors";
 import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
-import { saveSession, type Session } from "@/lib/history";
+import { saveSession, updateSession, type Session } from "@/lib/history";
+import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
 
 const ROLE_OPTIONS: VerificationRole[] = [
@@ -115,6 +116,9 @@ export default function HomePage() {
   >({});
   // which challenger card currently has its picker open
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
+  // id of the saved history session for this run, used to PUT updates
+  // when adjudications come in
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
   const [orStatus, setOrStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [orError, setOrError] = useState<string>("");
   const [groupOpen, setGroupOpen] = useState<GroupState>({});
@@ -337,6 +341,9 @@ export default function HomePage() {
     const initial: Record<string, ResultState> = {};
     selected.forEach((id) => (initial[id] = { status: "loading" }));
     setResults(initial);
+    // Each Verify starts a fresh history session; clear any prior linkage
+    setAdjudications({});
+    setSavedSessionId(null);
 
     // Capture rendered prompts so they can be stored in the session snapshot
     const promptsUsed: Record<string, string> = {};
@@ -470,6 +477,7 @@ export default function HomePage() {
 
         void saveSession(sessionPayload).then((res) => {
           if (res.ok) {
+            setSavedSessionId(res.id);
             toast.show("success", "Saved to history.");
           } else if (res.reason === "too-large") {
             toast.show("warn", "Run too large to save to history (over 500 KB).");
@@ -530,10 +538,14 @@ export default function HomePage() {
       });
       const json = (await res.json()) as { text?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      setAdjudications((a) => ({
-        ...a,
-        [key]: { status: "ok", text: json.text ?? "" },
-      }));
+      const okState: ResultState = { status: "ok", text: json.text ?? "" };
+      setAdjudications((a) => {
+        const next = { ...a, [key]: okState };
+        if (signedIn && savedSessionId) {
+          void persistAdjudications(next);
+        }
+        return next;
+      });
     } catch (err) {
       setAdjudications((a) => ({
         ...a,
@@ -543,6 +555,101 @@ export default function HomePage() {
         },
       }));
     }
+  }
+
+  function buildSessionPayload(
+    adjudicationsState: Record<string, ResultState>
+  ): Omit<Session, "id" | "createdAt"> | null {
+    const adjs: SessionAdjudication[] = [];
+    for (const [key, state] of Object.entries(adjudicationsState)) {
+      const [challengerId, adjudicatorId] = key.split("::");
+      const adjudicator = allModels.find((m) => m.id === adjudicatorId);
+      if (!adjudicator) continue;
+      if (state.status === "ok") {
+        const { verdict } = parseVerdict(state.text);
+        adjs.push({
+          challengerId,
+          adjudicatorId,
+          adjudicatorLabel: adjudicator.label,
+          status: "ok",
+          text: state.text,
+          verdict,
+        });
+      } else if (state.status === "error") {
+        adjs.push({
+          challengerId,
+          adjudicatorId,
+          adjudicatorLabel: adjudicator.label,
+          status: "error",
+          error: state.error,
+        });
+      }
+    }
+
+    return {
+      userQuestion,
+      claudeAnswer,
+      documentText,
+      documentFilename: docFileName,
+      selectedModels: selected
+        .map((id) => {
+          const model = allModels.find((m) => m.id === id);
+          if (!model) return null;
+          return {
+            id,
+            label: model.label,
+            role: getRole(id),
+            promptUsed: "",
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null),
+      results: selected
+        .map((id) => {
+          const r = results[id];
+          const model = allModels.find((m) => m.id === id);
+          if (!r || !model) return null;
+          if (r.status === "ok") {
+            const { verdict } = parseVerdict(r.text);
+            return {
+              modelId: id,
+              modelLabel: model.label,
+              role: getRole(id),
+              status: "ok" as const,
+              text: r.text,
+              verdict,
+            };
+          }
+          if (r.status === "deeplink") {
+            return {
+              modelId: id,
+              modelLabel: model.label,
+              role: getRole(id),
+              status: "deeplink" as const,
+            };
+          }
+          if (r.status === "error") {
+            return {
+              modelId: id,
+              modelLabel: model.label,
+              role: getRole(id),
+              status: "error" as const,
+              error: r.error,
+            };
+          }
+          return null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null),
+      adjudications: adjs,
+    };
+  }
+
+  async function persistAdjudications(
+    adjudicationsState: Record<string, ResultState>
+  ) {
+    if (!savedSessionId) return;
+    const payload = buildSessionPayload(adjudicationsState);
+    if (!payload) return;
+    await updateSession(savedSessionId, payload);
   }
 
   const totalToRun = selected.length;
