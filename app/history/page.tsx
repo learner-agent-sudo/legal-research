@@ -336,6 +336,9 @@ function ExpandedSession({
           const verdict = (r.verdict ?? "none") as Verdict;
           const style = VERDICT_STYLES[verdict];
           const cardStyle = r.status === "ok" ? RESULT_CARD_STYLES[verdict] : "bg-white dark:bg-slate-900";
+          const adjs = (session.adjudications ?? []).filter(
+            (a) => a.challengerId === r.modelId
+          );
           return (
             <div
               key={i}
@@ -368,6 +371,46 @@ function ExpandedSession({
               )}
               {r.status === "error" && (
                 <p className="text-xs text-rose-700 dark:text-rose-300">{r.error}</p>
+              )}
+              {adjs.length > 0 && (
+                <div className="mt-3 space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+                  {adjs.map((a, j) => {
+                    const v = (a.verdict ?? "none") as Verdict;
+                    const aStyle = VERDICT_STYLES[v];
+                    const verdictText = v === "green"
+                      ? "Critique looks correct"
+                      : v === "yellow"
+                      ? "Critique partially valid"
+                      : v === "red"
+                      ? "Critique is likely wrong"
+                      : "";
+                    const aCardStyle = a.status === "ok" ? RESULT_CARD_STYLES[v] : "bg-white dark:bg-slate-900";
+                    return (
+                      <div key={j} className={`rounded border p-2 ${aCardStyle}`}>
+                        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            Second opinion: {a.adjudicatorLabel}
+                          </span>
+                          {a.status === "ok" && v !== "none" && (
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${aStyle.chip}`}>
+                              {aStyle.emoji} {verdictText}
+                            </span>
+                          )}
+                        </div>
+                        {a.status === "ok" && a.text && (
+                          <div className="prose prose-xs max-w-none break-words dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {a.text.replace(/^\[(GREEN|YELLOW|RED)\]\s*/i, "")}
+                            </ReactMarkdown>
+                          </div>
+                        )}
+                        {a.status === "error" && (
+                          <p className="text-xs text-rose-700 dark:text-rose-300">{a.error}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           );
