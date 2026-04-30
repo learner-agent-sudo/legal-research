@@ -158,3 +158,55 @@ export function buildPromptForRole(
     .split(PROMPT_PLACEHOLDERS.claudeAnswer).join(claudeAnswer)
     .split(PROMPT_PLACEHOLDERS.documentText).join(documentText);
 }
+
+// ---------- Adjudication (second-opinion on a critique) ----------
+
+export type BuildAdjudicationArgs = BuildPromptArgs & {
+  challengerLabel: string;       // e.g. "Llama 3.3 70B (Groq, free)"
+  challengerVerdict: "yellow" | "red";
+  challengerCritique: string;    // the markdown body the challenger returned
+};
+
+export function buildAdjudicationPrompt(args: BuildAdjudicationArgs): string {
+  const userQuestion = args.userQuestion?.trim() || "[no question provided]";
+  const claudeAnswer = args.claudeAnswer.trim();
+  const documentText =
+    args.documentText?.trim().slice(0, MAX_DOC_CHARS) || "[no document attached]";
+  const critique = args.challengerCritique.trim();
+
+  return `You are adjudicating a disagreement between two AIs about a legal answer.
+
+A first AI (call it "Author") gave a legal answer. A second AI (call it "Challenger", model: ${args.challengerLabel}) reviewed it and raised concerns with verdict [${args.challengerVerdict.toUpperCase()}]. Your job is to decide whether the Challenger's concerns are valid — not to re-do the original review from scratch.
+
+${HONESTY_RULE}
+
+Format requirement: your VERY FIRST line must be exactly one of these three tags, on its own line:
+[GREEN] — the Challenger is correct; the Author's answer really does have the problems described
+[YELLOW] — the Challenger has a partial point, but it's overstated or some specifics are wrong
+[RED] — the Challenger is wrong; the Author's answer holds up
+Then leave a blank line and write your full response in Markdown.
+
+Original question:
+${userQuestion}
+
+Author's answer:
+"""
+${claudeAnswer}
+"""
+
+Reference document:
+"""
+${documentText}
+"""
+
+Challenger's critique:
+"""
+${critique}
+"""
+
+Provide:
+1. Verdict on each specific claim the Challenger makes — for each, is the Challenger right, partially right, or wrong, and why.
+2. Anything the Challenger missed that DOES weaken the Author's answer (if any).
+3. Anything the Challenger got materially wrong (e.g. fabricated counter-citations, misread the document).
+4. One-sentence bottom line: should the user trust the Author's original answer, the Challenger's critique, or neither?`;
+}
