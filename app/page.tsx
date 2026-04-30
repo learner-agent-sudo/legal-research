@@ -22,6 +22,7 @@ import {
   type RoleMap,
 } from "@/lib/storage";
 import {
+  buildAdjudicationPrompt,
   buildPromptForRole,
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
@@ -108,6 +109,12 @@ export default function HomePage() {
   const [roles, setRoles] = useState<RoleMap>({});
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [results, setResults] = useState<Record<string, ResultState>>({});
+  // adjudications keyed by `${challengerId}::${adjudicatorId}`
+  const [adjudications, setAdjudications] = useState<
+    Record<string, ResultState>
+  >({});
+  // which challenger card currently has its picker open
+  const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
   const [orStatus, setOrStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [orError, setOrError] = useState<string>("");
   const [groupOpen, setGroupOpen] = useState<GroupState>({});
@@ -476,6 +483,68 @@ export default function HomePage() {
     }
   }
 
+  async function runAdjudication(
+    challengerId: string,
+    adjudicatorId: string
+  ) {
+    const challenger = allModels.find((m) => m.id === challengerId);
+    const adjudicator = allModels.find((m) => m.id === adjudicatorId);
+    const challengerResult = results[challengerId];
+    if (!challenger || !adjudicator) return;
+    if (!challengerResult || challengerResult.status !== "ok") return;
+    if (adjudicator.kind === "deep-link") return;
+
+    const apiKey = apiKeys[adjudicator.provider];
+    if (!apiKey) {
+      toast.show("error", `No API key for ${adjudicator.provider}.`);
+      return;
+    }
+
+    const parsed = parseVerdict(challengerResult.text);
+    if (parsed.verdict !== "yellow" && parsed.verdict !== "red") return;
+
+    const key = `${challengerId}::${adjudicatorId}`;
+    setAdjudications((a) => ({ ...a, [key]: { status: "loading" } }));
+    setPickerOpenFor(null);
+
+    const prompt = buildAdjudicationPrompt({
+      claudeAnswer,
+      documentText,
+      userQuestion,
+      challengerLabel: challenger.label,
+      challengerVerdict: parsed.verdict,
+      challengerCritique: parsed.body,
+    });
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: adjudicator.kind,
+          baseUrl: adjudicator.baseUrl,
+          modelId: adjudicator.modelId,
+          apiKey,
+          prompt,
+        }),
+      });
+      const json = (await res.json()) as { text?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setAdjudications((a) => ({
+        ...a,
+        [key]: { status: "ok", text: json.text ?? "" },
+      }));
+    } catch (err) {
+      setAdjudications((a) => ({
+        ...a,
+        [key]: {
+          status: "error",
+          error: err instanceof Error ? err.message : "Failed",
+        },
+      }));
+    }
+  }
+
   const totalToRun = selected.length;
   const totalDone = Object.values(results).filter(
     (r) => r.status === "ok" || r.status === "error" || r.status === "deeplink"
@@ -829,6 +898,18 @@ export default function HomePage() {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
                 </div>
               )}
+              {r.status === "ok" && parsed && (parsed.verdict === "yellow" || parsed.verdict === "red") && (
+                <AdjudicationPanel
+                  challengerId={id}
+                  pickerOpenFor={pickerOpenFor}
+                  setPickerOpenFor={setPickerOpenFor}
+                  selected={selected}
+                  allModels={allModels}
+                  apiKeys={apiKeys}
+                  adjudications={adjudications}
+                  runAdjudication={runAdjudication}
+                />
+              )}
               {r.status === "deeplink" && (
                 <div className="text-sm">
                   <p className="mb-2 text-slate-700 dark:text-slate-300">
@@ -892,6 +973,140 @@ export default function HomePage() {
           </section>
         );
       })()}
+    </div>
+  );
+}
+
+function AdjudicationPanel({
+  challengerId,
+  pickerOpenFor,
+  setPickerOpenFor,
+  selected,
+  allModels,
+  apiKeys,
+  adjudications,
+  runAdjudication,
+}: {
+  challengerId: string;
+  pickerOpenFor: string | null;
+  setPickerOpenFor: (id: string | null) => void;
+  selected: string[];
+  allModels: ModelPreset[];
+  apiKeys: Record<string, string>;
+  adjudications: Record<string, ResultState>;
+  runAdjudication: (challengerId: string, adjudicatorId: string) => void;
+}) {
+  const candidates = selected
+    .map((id) => allModels.find((m) => m.id === id))
+    .filter((m): m is ModelPreset => Boolean(m))
+    .filter((m) => m.id !== challengerId)
+    .filter((m) => m.kind !== "deep-link")
+    .filter((m) => Boolean(apiKeys[m.provider]));
+
+  const adjudicationsForThis = Object.entries(adjudications).filter(([k]) =>
+    k.startsWith(`${challengerId}::`)
+  );
+
+  const isOpen = pickerOpenFor === challengerId;
+
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Not sure if this critique is right? Get a second opinion.
+        </p>
+        <button
+          onClick={() => setPickerOpenFor(isOpen ? null : challengerId)}
+          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        >
+          {isOpen ? "Cancel" : "Get a second opinion"}
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="mt-2 rounded border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800/50">
+          {candidates.length === 0 ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              No other API-backed models are selected. Pick another model in the list above first.
+            </p>
+          ) : (
+            <>
+              <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+                Pick a different model to review this critique:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {candidates.map((m) => {
+                  const key = `${challengerId}::${m.id}`;
+                  const existing = adjudications[key];
+                  const isLoading = existing?.status === "loading";
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => runAdjudication(challengerId, m.id)}
+                      disabled={isLoading}
+                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-blue-950/40"
+                    >
+                      {isLoading ? "…" : m.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {adjudicationsForThis.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {adjudicationsForThis.map(([key, state]) => {
+            const adjudicatorId = key.split("::")[1];
+            const adjudicator = allModels.find((m) => m.id === adjudicatorId);
+            if (!adjudicator) return null;
+            const parsed = state.status === "ok" ? parseVerdict(state.text) : null;
+            const style = parsed ? VERDICT_STYLES[parsed.verdict] : VERDICT_STYLES.none;
+            const verdictText = parsed?.verdict === "green"
+              ? "Critique looks correct"
+              : parsed?.verdict === "yellow"
+              ? "Critique partially valid"
+              : parsed?.verdict === "red"
+              ? "Critique is likely wrong"
+              : "";
+            return (
+              <div
+                key={key}
+                className={`rounded border p-2 text-sm ${
+                  state.status === "ok" ? style.card : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+                }`}
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Second opinion: {adjudicator.label}
+                  </span>
+                  {parsed && parsed.verdict !== "none" && (
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${style.chip}`}>
+                      {style.emoji} {verdictText}
+                    </span>
+                  )}
+                </div>
+                {state.status === "loading" && (
+                  <div className="space-y-1.5">
+                    <div className="h-2.5 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-2.5 w-4/5 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                )}
+                {state.status === "ok" && parsed && (
+                  <div className="prose prose-xs max-w-none break-words dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
+                  </div>
+                )}
+                {state.status === "error" && (
+                  <p className="text-xs text-rose-700 dark:text-rose-300">{state.error}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
