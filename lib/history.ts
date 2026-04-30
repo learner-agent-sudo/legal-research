@@ -79,6 +79,30 @@ export async function loadSession(id: string): Promise<LoadResult> {
   }
 }
 
+export async function updateSession(
+  id: string,
+  session: Omit<Session, "id" | "createdAt">
+): Promise<SaveResult> {
+  try {
+    const body = JSON.stringify(session);
+    const res = await fetch(`/api/user/history/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    if (res.status === 401) return { ok: false, reason: "not-signed-in" };
+    if (res.status === 503) return { ok: false, reason: "not-configured" };
+    if (res.status === 413) return { ok: false, reason: "too-large", message: "Session too large (max 500 KB)" };
+    if (!res.ok) {
+      const text = await res.text();
+      return { ok: false, reason: "error", message: `HTTP ${res.status}: ${text.slice(0, 200)}` };
+    }
+    return { ok: true, id };
+  } catch (err) {
+    return { ok: false, reason: "network", message: err instanceof Error ? err.message : "network error" };
+  }
+}
+
 export async function deleteSession(id: string): Promise<DeleteResult> {
   try {
     const res = await fetch(`/api/user/history/${id}`, { method: "DELETE" });

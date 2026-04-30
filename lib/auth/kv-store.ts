@@ -133,6 +133,16 @@ export type SessionResult = {
   error?: string;
 };
 
+export type SessionAdjudication = {
+  challengerId: string;       // matches a SessionResult.modelId
+  adjudicatorId: string;
+  adjudicatorLabel: string;
+  status: "ok" | "error";
+  text?: string;
+  verdict?: "green" | "yellow" | "red" | "none";
+  error?: string;
+};
+
 export type Session = {
   id: string;
   createdAt: string;
@@ -143,6 +153,7 @@ export type Session = {
   documentTruncated?: boolean;
   selectedModels: SessionModelSnapshot[];
   results: SessionResult[];
+  adjudications?: SessionAdjudication[];
 };
 
 export type SessionSummary = {
@@ -185,6 +196,51 @@ export async function deleteAllSessions(email: string): Promise<number> {
   await Promise.all(index.map((s) => r.del(`user:${emailKey(email)}:session:${s.id}`)));
   await r.del(`user:${emailKey(email)}:history-index`);
   return index.length;
+}
+
+export async function replaceSession(
+  email: string,
+  id: string,
+  patch: Omit<Session, "id" | "createdAt">
+): Promise<boolean> {
+  const existing = await getSession(email, id);
+  if (!existing) return false;
+
+  let documentText = patch.documentText;
+  let documentTruncated = patch.documentTruncated ?? false;
+  if (documentText.length > SESSION_DOC_MAX) {
+    documentText = documentText.slice(0, SESSION_DOC_MAX);
+    documentTruncated = true;
+  }
+
+  const full: Session = {
+    ...patch,
+    id,
+    createdAt: existing.createdAt,
+    documentText,
+    documentTruncated,
+  };
+
+  // Rebuild the summary so verdict counts in the index stay accurate
+  const verdictCounts = { green: 0, yellow: 0, red: 0, none: 0 };
+  for (const r of full.results) {
+    const v = (r.verdict ?? "none") as keyof typeof verdictCounts;
+    verdictCounts[v] = (verdictCounts[v] ?? 0) + 1;
+  }
+  const summary: SessionSummary = {
+    id,
+    createdAt: existing.createdAt,
+    questionPreview: (full.userQuestion || full.claudeAnswer).slice(0, 120),
+    modelCount: full.selectedModels.length,
+    verdictCounts,
+  };
+
+  await setSession(email, full);
+
+  const index = await getHistoryIndex(email);
+  const next = index.map((s) => (s.id === id ? summary : s));
+  await setHistoryIndex(email, next);
+  return true;
 }
 
 export async function appendSession(
