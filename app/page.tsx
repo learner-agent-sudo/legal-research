@@ -472,7 +472,7 @@ export default function HomePage() {
             setSavedSessionId(res.id);
             toast.show("success", "Saved to history.");
           } else if (res.reason === "too-large") {
-            toast.show("warn", "Run too large to save to history (over 500 KB).");
+            toast.show("warn", "Run too large to save to history (over 4 MB).");
           } else if (res.reason !== "not-signed-in" && res.reason !== "not-configured") {
             toast.show("error", "Could not save to history.");
           }
