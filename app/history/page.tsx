@@ -331,8 +331,24 @@ function ExpandedSession({
         )}
       </div>
 
-      <div className="space-y-3">
-        {session.results.map((r, i) => {
+      {(() => {
+        const verdictRank = (v: string | undefined): number => {
+          if (v === "red") return 0;
+          if (v === "yellow") return 1;
+          if (v === "green") return 2;
+          return 3;
+        };
+        const displayResults = session.results
+          .filter((r) => r.status !== "error")
+          .sort((a, b) => verdictRank(a.verdict) - verdictRank(b.verdict));
+        const nonGreenResults = displayResults.filter(
+          (r) => r.status !== "ok" || (r.verdict ?? "none") !== "green"
+        );
+        const greenResults = displayResults.filter(
+          (r) => r.status === "ok" && r.verdict === "green"
+        );
+
+        const renderResult = (r: Session["results"][number], i: number) => {
           const verdict = (r.verdict ?? "none") as Verdict;
           const style = VERDICT_STYLES[verdict];
           const cardStyle = r.status === "ok" ? RESULT_CARD_STYLES[verdict] : "bg-white dark:bg-slate-900";
@@ -340,20 +356,12 @@ function ExpandedSession({
             (a) => a.challengerId === r.modelId
           );
           return (
-            <div
-              key={i}
-              className={`rounded-lg border p-3 ${cardStyle}`}
-            >
+            <div key={i} className={`rounded-lg border p-3 ${cardStyle}`}>
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{r.modelLabel}</span>
                 {r.status === "ok" && verdict !== "none" && (
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${style.chip}`}>
                     {style.emoji} {verdict}
-                  </span>
-                )}
-                {r.status === "error" && (
-                  <span className="rounded bg-rose-100 px-2 py-0.5 text-xs text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                    Error
                   </span>
                 )}
                 {r.status === "deeplink" && (
@@ -368,9 +376,6 @@ function ExpandedSession({
                     {r.text.replace(/^\[(GREEN|YELLOW|RED)\]\s*/i, "")}
                   </ReactMarkdown>
                 </div>
-              )}
-              {r.status === "error" && (
-                <p className="text-xs text-rose-700 dark:text-rose-300">{r.error}</p>
               )}
               {adjs.length > 0 && (
                 <div className="mt-3 space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
@@ -414,8 +419,24 @@ function ExpandedSession({
               )}
             </div>
           );
-        })}
-      </div>
+        };
+
+        return (
+          <div className="space-y-3">
+            {nonGreenResults.map((r, i) => renderResult(r, i))}
+            {greenResults.length > 0 && (
+              <details className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <summary className="cursor-pointer text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                  ✓ {greenResults.length} confirmed correct — click to expand
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {greenResults.map((r, i) => renderResult(r, nonGreenResults.length + i))}
+                </div>
+              </details>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="flex justify-end">
         <button

@@ -461,15 +461,7 @@ export default function HomePage() {
                   status: "deeplink" as const,
                 };
               }
-              if (r.status === "error") {
-                return {
-                  modelId: id,
-                  modelLabel: model.label,
-                  role: getRole(id),
-                  status: "error" as const,
-                  error: r.error,
-                };
-              }
+              // error results are excluded from history
               return null;
             })
             .filter((x): x is NonNullable<typeof x> => x !== null),
@@ -627,15 +619,7 @@ export default function HomePage() {
               status: "deeplink" as const,
             };
           }
-          if (r.status === "error") {
-            return {
-              modelId: id,
-              modelLabel: model.label,
-              role: getRole(id),
-              status: "error" as const,
-              error: r.error,
-            };
-          }
+          // error results excluded from history
           return null;
         })
         .filter((x): x is NonNullable<typeof x> => x !== null),
@@ -951,11 +935,22 @@ export default function HomePage() {
 
       {Object.keys(results).length > 0 && (() => {
         const orderedIds = selected.filter((id) => results[id]);
-        const successIds = orderedIds.filter((id) => {
+        const loadingIds = orderedIds.filter((id) => results[id]?.status === "loading");
+        const doneIds = orderedIds.filter((id) => {
           const s = results[id]?.status;
-          return s === "ok" || s === "deeplink" || s === "loading";
+          return s === "ok" || s === "deeplink";
         });
         const errorIds = orderedIds.filter((id) => results[id]?.status === "error");
+
+        const verdictRank = (id: string): number => {
+          const r = results[id];
+          if (r?.status !== "ok") return 3;
+          const v = parseVerdict(r.text).verdict;
+          return v === "red" ? 0 : v === "yellow" ? 1 : v === "green" ? 2 : 3;
+        };
+        const sortedDoneIds = [...doneIds].sort((a, b) => verdictRank(a) - verdictRank(b));
+        const nonGreenDoneIds = sortedDoneIds.filter((id) => verdictRank(id) !== 2);
+        const greenDoneIds = sortedDoneIds.filter((id) => verdictRank(id) === 2);
 
         const renderCard = (id: string) => {
           const model = allModels.find((m) => m.id === id);
@@ -1032,28 +1027,11 @@ export default function HomePage() {
                   </a>
                 </div>
               )}
-              {r.status === "error" && (() => {
-                const e = humanizeError(r.error, model.label);
-                return (
-                  <div className="rounded border border-rose-200 bg-rose-50 p-3 text-sm dark:border-rose-900/50 dark:bg-rose-950/30">
-                    <p className="font-medium text-rose-800 dark:text-rose-300">{e.title}</p>
-                    <p className="mt-1 whitespace-pre-line text-rose-700 dark:text-rose-300/90">{e.hint}</p>
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-rose-600 dark:text-rose-400">
-                        Technical details
-                      </summary>
-                      <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-rose-900 dark:text-rose-200/90">
-                        {e.raw}
-                      </pre>
-                    </details>
-                  </div>
-                );
-              })()}
             </div>
           );
         };
 
-        const okCount = orderedIds.filter((id) => results[id]?.status === "ok").length;
+        const okCount = doneIds.filter((id) => results[id]?.status === "ok").length;
 
         return (
           <section className="space-y-4">
@@ -1065,16 +1043,42 @@ export default function HomePage() {
                 <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Results</h2>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {okCount} success · {errorIds.length} failed · {orderedIds.length} total
+                {okCount} answered · {errorIds.length} failed · {orderedIds.length} total
               </p>
             </div>
-            {successIds.map(renderCard)}
+            {loadingIds.map(renderCard)}
+            {nonGreenDoneIds.map(renderCard)}
+            {greenDoneIds.length > 0 && (
+              <details className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <summary className="cursor-pointer text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                  ✓ {greenDoneIds.length} confirmed correct — click to expand
+                </summary>
+                <div className="mt-3 space-y-3">{greenDoneIds.map(renderCard)}</div>
+              </details>
+            )}
             {errorIds.length > 0 && (
               <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
                 <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-300">
-                  {errorIds.length} model{errorIds.length === 1 ? "" : "s"} failed (click to expand)
+                  {errorIds.length} model{errorIds.length === 1 ? "" : "s"} failed — click to expand
                 </summary>
-                <div className="mt-3 space-y-3">{errorIds.map(renderCard)}</div>
+                <div className="mt-3 space-y-3">
+                  {errorIds.map((id) => {
+                    const model = allModels.find((m) => m.id === id);
+                    const r = results[id];
+                    if (!model || r?.status !== "error") return null;
+                    const e = humanizeError(r.error, model.label);
+                    return (
+                      <div key={id} className="rounded border border-rose-200 bg-rose-50 p-3 text-sm dark:border-rose-900/50 dark:bg-rose-950/30">
+                        <p className="font-medium text-rose-800 dark:text-rose-300">{model.label}: {e.title}</p>
+                        <p className="mt-1 whitespace-pre-line text-rose-700 dark:text-rose-300/90">{e.hint}</p>
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-rose-600 dark:text-rose-400">Technical details</summary>
+                          <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-rose-900 dark:text-rose-200/90">{e.raw}</pre>
+                        </details>
+                      </div>
+                    );
+                  })}
+                </div>
               </details>
             )}
           </section>
