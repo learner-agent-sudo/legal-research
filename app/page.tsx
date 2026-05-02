@@ -1009,6 +1009,7 @@ export default function HomePage() {
                   allModels={allModels}
                   apiKeys={apiKeys}
                   adjudications={adjudications}
+                  results={results}
                   runAdjudication={runAdjudication}
                 />
               )}
@@ -1096,6 +1097,7 @@ function AdjudicationPanel({
   allModels,
   apiKeys,
   adjudications,
+  results,
   runAdjudication,
 }: {
   challengerId: string;
@@ -1105,6 +1107,7 @@ function AdjudicationPanel({
   allModels: ModelPreset[];
   apiKeys: Record<string, string>;
   adjudications: Record<string, ResultState>;
+  results: Record<string, ResultState>;
   runAdjudication: (challengerId: string, adjudicatorId: string) => void;
 }) {
   const candidates = selected
@@ -1112,7 +1115,9 @@ function AdjudicationPanel({
     .filter((m): m is ModelPreset => Boolean(m))
     .filter((m) => m.id !== challengerId)
     .filter((m) => m.kind !== "deep-link")
-    .filter((m) => Boolean(apiKeys[m.provider]));
+    .filter((m) => Boolean(apiKeys[m.provider]))
+    // only models that successfully answered in the first round
+    .filter((m) => results[m.id]?.status === "ok");
 
   const adjudicationsForThis = Object.entries(adjudications).filter(([k]) =>
     k.startsWith(`${challengerId}::`)
