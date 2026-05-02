@@ -34,6 +34,7 @@ import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
 import { saveSession, updateSession, type Session } from "@/lib/history";
 import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
+import { Hero } from "@/components/Hero";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -659,6 +660,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
+      <Hero />
       <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         {sectionHeader(1, "Your question", "Optional — gives the AI context for what was asked.")}
         <textarea
