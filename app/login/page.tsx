@@ -20,9 +20,11 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string };
+      const json = (await res.json()) as { ok?: boolean; emailed?: boolean; error?: string };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      router.push(`/login/verify?email=${encodeURIComponent(email.trim())}`);
+      const params = new URLSearchParams({ email: email.trim() });
+      if (json.emailed === false) params.set("noEmail", "1");
+      router.push(`/login/verify?${params.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send code");
       setLoading(false);

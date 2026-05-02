@@ -9,8 +9,8 @@ export function getAllowedEmails(): string[] {
 export function isEmailAllowed(email: string): boolean {
   const allowed = getAllowedEmails();
   if (allowed.length === 0) {
-    // No whitelist configured yet — refuse everyone, fail-closed
-    return false;
+    // No whitelist configured — open mode, allow any valid email
+    return email.trim().includes("@");
   }
   return allowed.includes(email.trim().toLowerCase());
 }

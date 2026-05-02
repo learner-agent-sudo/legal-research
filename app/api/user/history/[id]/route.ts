@@ -11,7 +11,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SESSION_MAX_BYTES = 500_000;
+const SESSION_MAX_BYTES = 4_000_000;
 
 export async function GET(
   _req: NextRequest,
@@ -50,7 +50,7 @@ export async function PUT(
 
   const raw = await req.text();
   if (raw.length > SESSION_MAX_BYTES) {
-    return NextResponse.json({ error: "Session too large (max 500 KB)" }, { status: 413 });
+    return NextResponse.json({ error: "Session too large (max 4 MB)" }, { status: 413 });
   }
 
   let body: unknown;

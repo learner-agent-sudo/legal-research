@@ -8,6 +8,7 @@ function VerifyForm() {
   const router = useRouter();
   const params = useSearchParams();
   const email = params.get("email") ?? "";
+  const noEmail = params.get("noEmail") === "1";
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +39,17 @@ function VerifyForm() {
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
         We sent a code to <strong>{email}</strong>. It expires in 10 minutes.
       </p>
+      {noEmail && (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="font-medium">Email is not configured on this deployment.</p>
+          <p className="mt-1">
+            The code was logged to the server console instead. On Vercel, open
+            the project &rarr; <em>Logs</em> tab and look for a line starting
+            with <code>[auth]</code>. To enable real emails, set the{" "}
+            <code>RESEND_API_KEY</code> environment variable.
+          </p>
+        </div>
+      )}
 
       <form
         onSubmit={handleSubmit}

@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
     const code = generateOtp();
     const codeHash = hashOtp(code, email);
     await setOtp(email, codeHash);
-    await sendOtpEmail(email, code);
-    return NextResponse.json({ ok: true });
+    const emailed = await sendOtpEmail(email, code);
+    return NextResponse.json({ ok: true, emailed });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to send code";
     return NextResponse.json({ error: message }, { status: 500 });

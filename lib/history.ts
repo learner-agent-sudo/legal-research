@@ -50,7 +50,7 @@ export async function saveSession(
     });
     if (res.status === 401) return { ok: false, reason: "not-signed-in" };
     if (res.status === 503) return { ok: false, reason: "not-configured" };
-    if (res.status === 413) return { ok: false, reason: "too-large", message: "Session too large (max 500 KB)" };
+    if (res.status === 413) return { ok: false, reason: "too-large", message: "Session too large (max 4 MB)" };
     if (!res.ok) {
       const text = await res.text();
       return { ok: false, reason: "error", message: `HTTP ${res.status}: ${text.slice(0, 200)}` };
@@ -92,7 +92,7 @@ export async function updateSession(
     });
     if (res.status === 401) return { ok: false, reason: "not-signed-in" };
     if (res.status === 503) return { ok: false, reason: "not-configured" };
-    if (res.status === 413) return { ok: false, reason: "too-large", message: "Session too large (max 500 KB)" };
+    if (res.status === 413) return { ok: false, reason: "too-large", message: "Session too large (max 4 MB)" };
     if (!res.ok) {
       const text = await res.text();
       return { ok: false, reason: "error", message: `HTTP ${res.status}: ${text.slice(0, 200)}` };
