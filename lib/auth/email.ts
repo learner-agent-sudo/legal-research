@@ -8,7 +8,20 @@ function client(): Resend {
 
 const FROM_FALLBACK = "Legal Research <onboarding@resend.dev>";
 
-export async function sendOtpEmail(to: string, code: string): Promise<void> {
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
+// Returns true if the code was actually emailed; false if Resend isn't
+// configured and the OTP was logged to the server console instead.
+export async function sendOtpEmail(to: string, code: string): Promise<boolean> {
+  if (!isEmailConfigured()) {
+    console.warn(
+      `[auth] RESEND_API_KEY not set — OTP for ${to} is ${code} (expires in 10 minutes)`
+    );
+    return false;
+  }
+
   const from = requireAscii(
     process.env.EMAIL_FROM ?? FROM_FALLBACK,
     "EMAIL_FROM"
@@ -32,4 +45,5 @@ export async function sendOtpEmail(to: string, code: string): Promise<void> {
   if (error) {
     throw new Error(`Resend error: ${error.message ?? "unknown"}`);
   }
+  return true;
 }
