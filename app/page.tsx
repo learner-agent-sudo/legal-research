@@ -35,6 +35,7 @@ import { saveSession, updateSession, type Session } from "@/lib/history";
 import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
 import { Hero } from "@/components/Hero";
+import { RefinePanel } from "@/components/RefinePanel";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -1085,6 +1086,48 @@ export default function HomePage() {
               </details>
             )}
           </section>
+        );
+      })()}
+
+      {(() => {
+        const refineResults = selected
+          .map((id) => {
+            const r = results[id];
+            const model = allModels.find((m) => m.id === id);
+            if (!r || !model || r.status !== "ok") return null;
+            const { verdict } = parseVerdict(r.text);
+            return {
+              modelId: id,
+              modelLabel: model.label,
+              text: r.text,
+              verdict,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+
+        const refineAdjudications = Object.entries(adjudications)
+          .map(([key, state]) => {
+            if (state.status !== "ok") return null;
+            const [challengerId, adjudicatorId] = key.split("::");
+            const adjudicator = allModels.find((m) => m.id === adjudicatorId);
+            if (!adjudicator) return null;
+            const { verdict } = parseVerdict(state.text);
+            return {
+              challengerId,
+              adjudicatorLabel: adjudicator.label,
+              verdict,
+              text: state.text,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+
+        return (
+          <RefinePanel
+            userQuestion={userQuestion}
+            claudeAnswer={claudeAnswer}
+            results={refineResults}
+            adjudications={refineAdjudications}
+          />
         );
       })()}
     </div>
