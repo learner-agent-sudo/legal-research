@@ -210,3 +210,83 @@ Provide:
 3. Anything the Challenger got materially wrong (e.g. fabricated counter-citations, misread the document).
 4. One-sentence bottom line: should the user trust the Author's original answer, the Challenger's critique, or neither?`;
 }
+
+// ---------- Refinement (send critiques back to the original Claude) ----------
+
+export type RefinementAdjudication = {
+  adjudicatorLabel: string;
+  // adjudication semantics: green = challenger correct (Claude wrong),
+  // yellow = partial, red = challenger wrong (Claude right)
+  verdict: "green" | "yellow" | "red" | "none";
+  summary: string;
+};
+
+export type RefinementCritique = {
+  modelLabel: string;
+  verdict: "yellow" | "red";
+  critique: string;
+  adjudications?: RefinementAdjudication[];
+};
+
+export type BuildRefinementArgs = {
+  userQuestion?: string;
+  claudeAnswer: string;
+  critiques: RefinementCritique[];
+  // when true, include the original question + answer so the prompt
+  // works as a fresh conversation rather than a follow-up
+  selfContained?: boolean;
+};
+
+function adjudicationLine(a: RefinementAdjudication): string {
+  const stance =
+    a.verdict === "green"
+      ? "AGREED with this concern"
+      : a.verdict === "yellow"
+      ? "partly agreed with this concern"
+      : a.verdict === "red"
+      ? "DISAGREED — said the original answer was actually fine"
+      : "gave no clear verdict";
+  return `  • Second opinion (${a.adjudicatorLabel}) ${stance}: ${a.summary.trim().slice(0, 400)}`;
+}
+
+export function buildRefinementPrompt(args: BuildRefinementArgs): string {
+  const { critiques, selfContained } = args;
+  const reds = critiques.filter((c) => c.verdict === "red");
+  const yellows = critiques.filter((c) => c.verdict === "yellow");
+  const ordered = [...reds, ...yellows];
+
+  const concernBlocks = ordered.map((c, i) => {
+    const severity = c.verdict === "red" ? "MAJOR ISSUES" : "Some concerns";
+    const adjLines = (c.adjudications ?? []).map(adjudicationLine).join("\n");
+    return [
+      `──────── Concern ${i + 1} (${c.modelLabel} — ${severity}) ────────`,
+      c.critique.trim(),
+      adjLines || null,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  });
+
+  const header = selfContained
+    ? `I previously asked you a legal-research question and your answer was:
+
+ORIGINAL QUESTION:
+${args.userQuestion?.trim() || "[no question recorded]"}
+
+YOUR PREVIOUS ANSWER:
+"""
+${args.claudeAnswer.trim()}
+"""
+
+I cross-checked your answer with several independent AI models. They raised the following concerns:`
+    : `I cross-checked your previous answer with several independent AI models. They raised the following concerns:`;
+
+  const footer = `Please review these critiques carefully and revise your earlier answer. For each concern:
+1. State whether you agree, partly agree, or disagree.
+2. If you agree, integrate the correction into a revised answer.
+3. If you disagree, explain why with specific authority — do not just brush the concern aside.
+
+Then provide the revised, complete answer in full. Be honest about points where the critics were right; that's the point of this exercise.`;
+
+  return [header, concernBlocks.join("\n\n"), footer].join("\n\n");
+}
