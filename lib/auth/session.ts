@@ -5,18 +5,33 @@ import { createHash, randomBytes } from "crypto";
 const COOKIE_NAME = "lr_session";
 const SESSION_DAYS = 30;
 
-function getSecret(): Uint8Array {
-  const raw = process.env.SESSION_SECRET;
-  if (!raw || raw.length < 32) {
-    throw new Error("SESSION_SECRET is not set or is shorter than 32 characters.");
+// Fallback secret used when SESSION_SECRET env var is not set.
+// Sessions signed with this won't survive server restarts, but the app stays
+// usable. Set SESSION_SECRET in Vercel env vars for persistent sessions.
+let _ephemeralSecret: string | null = null;
+function ephemeralSecret(): string {
+  if (!_ephemeralSecret) {
+    const { randomBytes } = require("crypto") as typeof import("crypto");
+    _ephemeralSecret = randomBytes(32).toString("hex");
+    console.warn(
+      "[auth] SESSION_SECRET is not set — using an ephemeral secret. " +
+        "Sessions will not survive server restarts. " +
+        "Set SESSION_SECRET (32+ chars) in your environment for persistent sessions."
+    );
   }
-  return new TextEncoder().encode(raw);
+  return _ephemeralSecret;
+}
+
+function getSecret(): Uint8Array {
+  const raw = process.env.SESSION_SECRET?.trim();
+  return new TextEncoder().encode(raw && raw.length >= 32 ? raw : ephemeralSecret());
 }
 
 function getSecretOrNull(): Uint8Array | null {
-  const raw = process.env.SESSION_SECRET;
-  if (!raw || raw.length < 32) return null;
-  return new TextEncoder().encode(raw);
+  const raw = process.env.SESSION_SECRET?.trim();
+  if (raw && raw.length >= 32) return new TextEncoder().encode(raw);
+  // Return the ephemeral secret so existing cookies can still be verified
+  return new TextEncoder().encode(ephemeralSecret());
 }
 
 export type SessionPayload = {
