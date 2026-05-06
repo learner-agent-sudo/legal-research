@@ -116,7 +116,7 @@ export function normaliseSection(raw: string): string {
  * (after a newline, optional whitespace), optionally followed by (N).
  * We capture until the next section number at the same level.
  */
-function extractSectionFromText(text: string, section: string): string | null {
+export function extractSectionFromText(text: string, section: string): string | null {
   // Get the bare number (e.g. "116" from "116(2)")
   const mainNum = section.replace(/[^0-9.]/g, "");
   if (!mainNum) return null;
@@ -175,7 +175,7 @@ function getNextSectionNum(num: string): string {
 
 // ── HTML → plain text ─────────────────────────────────────────────────────
 
-function htmlToText(html: string): string {
+export function htmlToText(html: string): string {
   return html
     // Remove scripts and styles entirely
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
