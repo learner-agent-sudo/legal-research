@@ -44,6 +44,23 @@ export const BUILTIN_PRESETS: ModelPreset[] = [
     modelId: "gemini-2.5-pro",
   },
   {
+    id: "mistral-small",
+    label: "Mistral Small (Mistral, free tier)",
+    provider: "mistral",
+    kind: "openai-compat",
+    baseUrl: "https://api.mistral.ai/v1",
+    modelId: "mistral-small-latest",
+  },
+  {
+    id: "mistral-large",
+    label: "Mistral Large (Mistral, paid)",
+    provider: "mistral",
+    kind: "openai-compat",
+    baseUrl: "https://api.mistral.ai/v1",
+    modelId: "mistral-large-latest",
+    note: "Mistral's flagship model — paid tier, higher rate limits.",
+  },
+  {
     id: "chatgpt-web",
     label: "ChatGPT (web, manual paste)",
     provider: "chatgpt",
