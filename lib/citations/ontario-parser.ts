@@ -1,11 +1,9 @@
 /**
- * Parses Ontario e-Laws HTML pages to extract section text.
- * Does NOT use cheerio — relies on structural patterns in ontario.ca/laws HTML.
+ * Fetches Ontario legislation from e-Laws and extracts section text.
  *
- * The e-Laws statute page structure (as of 2024):
- *   <div class="act-provision"> or <div class="section"> blocks
- *   Each section has an id like "s14", "s14s1", "s14s2", etc.
- *   Headings use <b> or <strong> with the section number.
+ * Strategy: strip all HTML to plain text first, then find section numbers
+ * in the plain text. This is resilient to HTML structural changes and avoids
+ * the brittleness of tag-based parsing.
  */
 
 export type SectionResult =
@@ -13,9 +11,9 @@ export type SectionResult =
   | { found: false; reason: string; url: string };
 
 /**
- * Fetch and parse a specific section from an Ontario e-Laws statute page.
+ * Fetch and extract a specific section from an Ontario e-Laws statute page.
  * actCode: e.g. "00e41" (Employment Standards Act, 2000)
- * section: e.g. "14", "14(2)", "14.1", "s. 14"
+ * section: e.g. "14", "14(2)", "116", "s. 116"
  */
 export async function fetchOntarioSection(
   actCode: string,
@@ -29,15 +27,20 @@ export async function fetchOntarioSection(
     const res = await fetch(baseUrl, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; LegalResearchVerifier/1.0; educational use)",
-        Accept: "text/html",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-CA,en;q=0.9",
+        "Cache-Control": "no-cache",
       },
-      // 10-second timeout
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(12_000),
     });
 
     if (!res.ok) {
-      return { found: false, reason: `HTTP ${res.status} from e-Laws`, url: baseUrl };
+      return {
+        found: false,
+        reason: `HTTP ${res.status} when fetching from e-Laws. The site may be temporarily unavailable.`,
+        url: baseUrl,
+      };
     }
     html = await res.text();
   } catch (err) {
@@ -48,160 +51,133 @@ export async function fetchOntarioSection(
     };
   }
 
-  // Try to extract the section
-  const extracted = extractSection(html, normSec);
+  // Sanity check — if the page is very small it's probably a shell / error page
+  if (html.length < 5000) {
+    return {
+      found: false,
+      reason: "The e-Laws page returned very little content — it may be JavaScript-rendered or unavailable server-side.",
+      url: baseUrl,
+    };
+  }
+
+  // Convert HTML to plain text, then extract the section
+  const plainText = htmlToText(html);
+  const extracted = extractSectionFromText(plainText, normSec);
+
   if (extracted) {
     return { found: true, sectionId: normSec, text: extracted, url: baseUrl };
   }
 
-  // Fallback: return a window of text around the section number mention
-  const fallback = fallbackExtract(html, normSec);
-  if (fallback) {
-    return { found: true, sectionId: normSec, text: fallback, url: baseUrl };
-  }
-
   return {
     found: false,
-    reason: `Section ${section} not found in the act page. The act was fetched but the section could not be located.`,
+    reason: `Section ${section} could not be located in the act text. The act page was retrieved (${Math.round(html.length / 1024)} KB) but section ${normSec} was not found. Check the section number or try viewing the act directly.`,
     url: baseUrl,
   };
 }
 
 /**
- * Normalise a section reference to a consistent form.
- * "s. 14(2)" → "14(2)", "section 14" → "14", "14.1(2)(a)" → "14.1(2)(a)"
+ * Normalise a section reference to a consistent bare form.
+ * "s. 14(2)" → "14(2)", "section 116" → "116", "s 14" → "14"
  */
 export function normaliseSection(raw: string): string {
   return raw
-    .replace(/^(section|s\.?\s*)/i, "")
+    .replace(/^(section|subsection|sub-section|s\.?\s*)/i, "")
     .replace(/\s+/g, "")
     .trim();
 }
 
-// ── HTML extraction ──────────────────────────────────────────────────────────
+// ── Plain-text section extraction ─────────────────────────────────────────
 
 /**
- * Extract the text of a section from e-Laws HTML.
- * Strategy:
- * 1. Look for id attributes: id="s14", id="s14s2", id="s14p2"
- * 2. Look for <b>14</b> or <strong>14</strong> at the start of a paragraph
- * 3. Take text until the next section starts
+ * Extract a section from the plain text of a statute.
+ *
+ * Ontario legislation plain text (after HTML stripping) looks like:
+ *
+ *   ...marginal note...
+ *   116 (1) First subsection text here.
+ *   (2) Second subsection text.
+ *   ...
+ *   117 Next section starts here.
+ *
+ * We look for the section number at the start of a "paragraph unit"
+ * (after a newline, optional whitespace), optionally followed by (N).
+ * We capture until the next section number at the same level.
  */
-function extractSection(html: string, section: string): string | null {
-  // Build candidate id patterns for the section number
-  // "14"      → s14
-  // "14(2)"   → s14s2, s14p2
-  // "14.1"    → s14p1, s14s1 (period → p or s)
-  const ids = buildSectionIds(section);
-
-  for (const id of ids) {
-    const pattern = new RegExp(
-      `id=["']${escapeRe(id)}["'][^>]*>([\\s\\S]*?)(?=id=["'][a-z]|<\\/body)`,
-      "i"
-    );
-    const m = html.match(pattern);
-    if (m) {
-      return htmlToText(m[1]).trim();
-    }
-  }
-
-  // Try anchor approach: find <a name="BK{n}"> followed by section heading
-  // ontario.ca wraps sections in divs with sequential BK anchors
-  // We look for "Section N" text nearby
-  const anchorPattern = new RegExp(
-    `(?:Section\\s+${escapeRe(section.replace(/\(\d+\).*$/, ""))})[^]*?(?=Section\\s+\\d|$)`,
-    "i"
-  );
-  const am = html.match(anchorPattern);
-  if (am) {
-    const text = htmlToText(am[0]).trim();
-    if (text.length > 20 && text.length < 8000) return text;
-  }
-
-  return null;
-}
-
-/**
- * Fallback: find text around the first mention of the section number in bold/heading context.
- */
-function fallbackExtract(html: string, section: string): string | null {
-  // e-Laws uses marginal notes like "Employment standards" before each section,
-  // and section numbers appear as bold text
-  const mainNum = section.replace(/[^0-9.]/g, "").split(".")[0];
+function extractSectionFromText(text: string, section: string): string | null {
+  // Get the bare number (e.g. "116" from "116(2)")
+  const mainNum = section.replace(/[^0-9.]/g, "");
   if (!mainNum) return null;
 
-  // Pattern: bold/strong containing just the section number, then paragraph text
-  const patterns = [
-    // <b>14 </b> or <b>14</b> (maybe with subsection)
-    new RegExp(
-      `<(?:b|strong)[^>]*>\\s*${escapeRe(mainNum)}(?:\\s*\\(1\\))?\\s*<\\/(?:b|strong)>([\\s\\S]{50,2000}?)(?=<(?:b|strong)[^>]*>\\s*${escapeRe(String(Number(mainNum) + 1))}|$)`,
-      "i"
-    ),
-    // "14." pattern (section number followed by period and text on same line)
-    new RegExp(
-      `>\\s*${escapeRe(mainNum)}\\.\\s*</[^>]+>([\\s\\S]{50,2000}?)(?=>\\s*${escapeRe(String(Number(mainNum) + 1))}\\.\\s*<)`,
-      "i"
-    ),
-  ];
+  const nextNum = getNextSectionNum(mainNum);
 
-  for (const pat of patterns) {
-    const m = html.match(pat);
-    if (m) {
-      const text = htmlToText(m[0]).trim();
-      if (text.length > 30) return text.slice(0, 3000);
+  // Pattern: section number at start of a line (with optional leading whitespace)
+  // Followed by optional subsection "(N)" and then content
+  // Stops at the next section number at the same level
+  const sectionPattern = new RegExp(
+    `(?:^|\\n)[ \\t]*${escapeRe(mainNum)}[ \\t]*(?:\\([^)]+\\))?[ \\t](.+?)` +
+    `(?=\\n[ \\t]*${escapeRe(nextNum)}[ \\t]*(?:\\([^)]+\\))?[ \\t]|$)`,
+    "s" // dotAll — . matches newlines
+  );
+
+  const m = text.match(sectionPattern);
+  if (m) {
+    const result = (`${mainNum} ` + m[1]).trim();
+    if (result.length > 20 && result.length < 15000) {
+      return result.slice(0, 8000);
     }
+  }
+
+  // Fallback: looser match — find the number on its own line, grab the next N lines
+  const loosePattern = new RegExp(
+    `(?:^|\\n)[ \\t]*${escapeRe(mainNum)}[ \\t]*(?:\\n|[ \\t].{1,2000})`,
+    "m"
+  );
+  const lm = text.match(loosePattern);
+  if (lm) {
+    // Get 60 lines starting from this match
+    const startIdx = text.indexOf(lm[0]);
+    const chunk = text.slice(startIdx, startIdx + 6000);
+    const lines = chunk.split("\n");
+
+    // Find where next section starts within those lines
+    const nextSectionRe = new RegExp(`^[ \\t]*${escapeRe(nextNum)}[ \\t]`);
+    const endLineIdx = lines.findIndex((l, i) => i > 0 && nextSectionRe.test(l));
+    const relevant = endLineIdx > 0 ? lines.slice(0, endLineIdx) : lines.slice(0, 60);
+
+    const result = relevant.join("\n").trim();
+    if (result.length > 20) return result.slice(0, 8000);
   }
 
   return null;
 }
 
-function buildSectionIds(section: string): string[] {
-  // "14"     → ["s14"]
-  // "14(2)"  → ["s14s2", "s14p2"]
-  // "14(2)(a)" → ["s14s2a", "s14p2a"]
-  // "14.1"   → ["s14p1", "s14s1", "s14-1"]
-  const ids: string[] = [];
-  const norm = section.replace(/\s/g, "");
-
-  // Simple numeric section
-  if (/^\d+$/.test(norm)) {
-    ids.push(`s${norm}`);
-    return ids;
+/** For section "116", the next section is "117". For "14.1" it's "14.2". */
+function getNextSectionNum(num: string): string {
+  if (num.includes(".")) {
+    const [main, sub] = num.split(".");
+    return `${main}.${Number(sub) + 1}`;
   }
-
-  // Section with subsections in parens: 14(2)(a)
-  const parts = norm.split(/[()]+/).filter(Boolean);
-  if (parts.length >= 2) {
-    let id = `s${parts[0]}`;
-    ids.push(id);
-    for (let i = 1; i < parts.length; i++) {
-      id += `s${parts[i]}`;
-      ids.push(id);
-      ids.push(id.replace(/s([a-z])$/, "$1")); // variant without "s" prefix for letters
-    }
-  }
-
-  // Section with decimal: 14.1
-  if (norm.includes(".")) {
-    const [main, sub] = norm.split(".");
-    ids.push(`s${main}p${sub}`, `s${main}s${sub}`, `s${main}-${sub}`);
-  }
-
-  // Always add bare version
-  ids.push(`s${norm.replace(/[^0-9a-z]/gi, "")}`);
-
-  return [...new Set(ids)];
+  return String(Number(num) + 1);
 }
 
-/** Very lightweight HTML → plain text (no dependency). */
+// ── HTML → plain text ─────────────────────────────────────────────────────
+
 function htmlToText(html: string): string {
   return html
+    // Remove scripts and styles entirely
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<head[\s\S]*?<\/head>/gi, " ")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<header[\s\S]*?<\/header>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    // Block-level elements → newlines
+    .replace(/<\/?(p|div|section|article|li|tr|h[1-6])[^>]*>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<li[^>]*>/gi, "  • ")
+    .replace(/<\/?(td|th)[^>]*>/gi, " ")
+    // Remove all remaining tags
     .replace(/<[^>]+>/g, "")
+    // Decode entities
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -210,7 +186,10 @@ function htmlToText(html: string): string {
     .replace(/&nbsp;/g, " ")
     .replace(/&mdash;/g, "—")
     .replace(/&ndash;/g, "–")
+    .replace(/&#\d+;/g, " ")
+    // Normalise whitespace
     .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
