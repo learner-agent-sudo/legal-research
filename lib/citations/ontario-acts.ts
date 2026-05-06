@@ -133,37 +133,41 @@ for (const act of ACTS) {
   const withoutYear = normalise(act.fullName).replace(/,\s*\d{4}$/, "").trim();
   if (!INDEX.has(withoutYear)) INDEX.set(withoutYear, act);
 
-  // also index short form: first letter of each significant word, drop "Act" / "the" / "of"
+  // also index short form: drop "Act" / "the" / "of" / years AND any punctuation
+  const STOP_WORDS = new Set([
+    "act", "the", "of", "and", "a", "an", "to", "for", "on",
+    "1994", "1995", "1996", "1997", "1998", "1999",
+    "2000", "2001", "2002", "2003", "2004", "2005",
+    "2006", "2007", "2008", "2009", "2010",
+  ]);
   const short = act.fullName
     .replace(/\(.*?\)/g, "")
-    .split(" ")
-    .filter(
-      (w) =>
-        !["act", "the", "of", "and", "a", "an", "to", "for", "1994", "1995",
-          "1996", "1997", "1998", "1999", "2000", "2001", "2002", "2003",
-          "2004", "2005", "2006", "2007", "2008", "2009", "2010"].includes(
-          w.toLowerCase()
-        )
-    )
-    .map((w) => w.toLowerCase())
+    .split(/\s+/)
+    .map((w) => w.replace(/[,.;:]/g, "").toLowerCase())
+    .filter((w) => w && !STOP_WORDS.has(w))
     .join(" ");
   if (short && !INDEX.has(short)) INDEX.set(short, act);
 }
 
 export function findOntarioAct(name: string): OntarioAct | null {
   const key = normalise(name);
+  if (!key || key.length < 3) return null;
 
   // exact match
   if (INDEX.has(key)) return INDEX.get(key)!;
 
   // without year
   const withoutYear = key.replace(/,?\s*\d{4}$/, "").trim();
-  if (INDEX.has(withoutYear)) return INDEX.get(withoutYear)!;
+  if (withoutYear && INDEX.has(withoutYear)) return INDEX.get(withoutYear)!;
 
   // substring: find any indexed name that fully contains key, or key contains it
-  for (const [indexed, act] of INDEX.entries()) {
-    if (indexed.includes(withoutYear) || withoutYear.includes(indexed)) {
-      return act;
+  // (skip very short indexed entries to avoid spurious matches)
+  if (withoutYear.length >= 5) {
+    for (const [indexed, act] of INDEX.entries()) {
+      if (indexed.length < 5) continue;
+      if (indexed.includes(withoutYear) || withoutYear.includes(indexed)) {
+        return act;
+      }
     }
   }
 
