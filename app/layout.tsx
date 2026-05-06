@@ -90,6 +90,12 @@ function Header({ session }: { session: SessionInfo }) {
               >
                 Prompts
               </Link>
+              <Link
+                href="/citation-test"
+                className="rounded px-2 py-1 text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Citations
+              </Link>
               {session && (
                 <Link
                   href="/history"
