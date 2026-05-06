@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ProviderPings } from "@/components/ProviderPings";
 
 type Check = {
   name: string;
@@ -35,8 +36,7 @@ export default function DiagPage() {
     try {
       const res = await fetch("/api/diag/self-test", { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as SelfTestResponse;
-      setData(json);
+      setData((await res.json()) as SelfTestResponse);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -44,32 +44,29 @@ export default function DiagPage() {
     }
   }
 
-  useEffect(() => {
-    runSelfTest();
-  }, []);
+  useEffect(() => { runSelfTest(); }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl dark:text-slate-100">
           Diagnostics
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Self-test of the citation library and environment. Provider connectivity
-          checks come in a later release.
+          Library self-test, environment info, and provider connectivity.
         </p>
       </header>
 
-      {/* ── Self-test ─────────────────────────────────────────────────── */}
+      {/* ── Library self-test ─────────────────────────────────────────── */}
       <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             Library self-test
           </h2>
           <button
             onClick={runSelfTest}
             disabled={loading}
-            className="rounded border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="shrink-0 rounded border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {loading ? "Running…" : "Re-run"}
           </button>
@@ -82,38 +79,42 @@ export default function DiagPage() {
         {data && (
           <>
             <SummaryBadge summary={data.summary} />
-            <ul className="mt-3 space-y-1">
+            <ul className="mt-3 space-y-1.5">
               {data.checks.map((c, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-2 text-sm"
-                >
-                  <span
-                    className={
-                      c.status === "pass"
-                        ? "shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-950 dark:text-green-300"
-                        : "shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800 dark:bg-red-950 dark:text-red-300"
-                    }
-                  >
-                    {c.status.toUpperCase()}
-                  </span>
-                  <span className="flex-1 text-slate-700 dark:text-slate-300">
-                    {c.name}
-                    {c.detail && (
-                      <span className="ml-2 text-xs text-red-600 dark:text-red-400">
-                        — {c.detail}
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-400">
-                    {c.ms}ms
-                  </span>
+                <li key={i} className="flex flex-col gap-0.5 rounded-md border border-slate-100 px-3 py-2 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={
+                        c.status === "pass"
+                          ? "shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-800 dark:bg-green-950 dark:text-green-300"
+                          : "shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-800 dark:bg-red-950 dark:text-red-300"
+                      }
+                    >
+                      {c.status === "pass" ? "PASS" : "FAIL"}
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-300">
+                      {c.name}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-400">{c.ms}ms</span>
+                  </div>
+                  {c.detail && (
+                    <p className="pl-1 text-xs text-red-600 dark:text-red-400 break-words">
+                      {c.detail}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
           </>
         )}
+
+        {loading && !data && (
+          <div className="py-6 text-center text-sm text-slate-400">Running checks…</div>
+        )}
       </section>
+
+      {/* ── Provider connectivity ──────────────────────────────────────── */}
+      <ProviderPings />
 
       {/* ── Environment ───────────────────────────────────────────────── */}
       {data && (
@@ -121,38 +122,20 @@ export default function DiagPage() {
           <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
             Environment
           </h2>
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-            <Row label="Node version" value={data.env.nodeVersion} />
-            <Row label="Vercel env" value={data.env.vercelEnv ?? "—"} />
-            <Row label="Branch" value={data.env.vercelGitCommitRef ?? "—"} />
-            <Row label="Commit" value={data.env.vercelGitCommitSha ?? "—"} mono />
-            <Row label="Vercel URL" value={data.env.vercelUrl ?? "—"} mono />
-            <Row
-              label="SESSION_SECRET"
-              value={data.env.sessionSecretConfigured ? "set" : "fallback"}
-            />
-            <Row
-              label="Upstash KV"
-              value={data.env.upstashConfigured ? "configured" : "not configured"}
-            />
+          <dl className="space-y-0.5 text-sm">
+            <EnvRow label="Node version"     value={data.env.nodeVersion} />
+            <EnvRow label="Vercel env"       value={data.env.vercelEnv ?? "—"} />
+            <EnvRow label="Branch"           value={data.env.vercelGitCommitRef ?? "—"} />
+            <EnvRow label="Commit"           value={data.env.vercelGitCommitSha ?? "—"} mono />
+            <EnvRow label="Vercel URL"       value={data.env.vercelUrl ?? "—"} mono />
+            <EnvRow label="SESSION_SECRET"   value={data.env.sessionSecretConfigured ? "set ✓" : "fallback (set it in Vercel)"} warn={!data.env.sessionSecretConfigured} />
+            <EnvRow label="Upstash KV"       value={data.env.upstashConfigured ? "configured ✓" : "not configured"} />
           </dl>
           <p className="mt-3 text-xs text-slate-400">
             Last run: {new Date(data.timestamp).toLocaleString()}
           </p>
         </section>
       )}
-
-      {/* ── Provider checks (Piece 5 placeholder) ─────────────────────── */}
-      <section className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-        <h2 className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Provider connectivity (coming soon)
-        </h2>
-        <p>
-          A future release will ping each configured AI provider (OpenRouter, Groq,
-          Gemini, Mistral, etc.) using your stored API key and report latency and
-          status. Today this section is a placeholder.
-        </p>
-      </section>
     </div>
   );
 }
@@ -161,36 +144,42 @@ function SummaryBadge({ summary }: { summary: SelfTestResponse["summary"] }) {
   const allPassed = summary.failed === 0;
   return (
     <div
-      className={
+      className={`rounded border px-3 py-2 text-sm ${
         allPassed
-          ? "rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
-          : "rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
-      }
+          ? "border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300"
+          : "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+      }`}
     >
       <strong>{summary.passed}</strong> / {summary.total} checks passed
-      {summary.failed > 0 && <> — {summary.failed} failed</>}
+      {summary.failed > 0 && <> — <strong>{summary.failed}</strong> failed</>}
     </div>
   );
 }
 
-function Row({
+function EnvRow({
   label,
   value,
   mono = false,
+  warn = false,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  warn?: boolean;
 }) {
   return (
-    <div className="flex justify-between gap-2 border-b border-slate-100 py-1 dark:border-slate-800">
-      <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-b border-slate-100 py-1.5 dark:border-slate-800">
+      <dt className="shrink-0 text-slate-500 dark:text-slate-400">{label}</dt>
       <dd
-        className={
-          mono
-            ? "truncate font-mono text-xs text-slate-700 dark:text-slate-300"
-            : "truncate text-slate-700 dark:text-slate-300"
-        }
+        className={[
+          "min-w-0 break-all text-right",
+          mono ? "font-mono text-xs" : "",
+          warn
+            ? "text-amber-600 dark:text-amber-400"
+            : "text-slate-700 dark:text-slate-300",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         {value}
       </dd>
