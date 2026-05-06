@@ -8,7 +8,7 @@
 
 export type SectionResult =
   | { found: true; sectionId: string; text: string; url: string }
-  | { found: false; reason: string; url: string };
+  | { found: false; reason: string; url: string; debug?: { plainTextSample: string; htmlLength: number; plainTextLength: number } };
 
 /**
  * Fetch and extract a specific section from an Ontario e-Laws statute page.
@@ -68,10 +68,23 @@ export async function fetchOntarioSection(
     return { found: true, sectionId: normSec, text: extracted, url: baseUrl };
   }
 
+  // Sample the plain text for debugging — first 1500 chars + a slice that contains
+  // any mention of the section number, if present
+  const numIdx = plainText.search(new RegExp(`\\b${escapeRe(normSec.replace(/[^0-9]/g, ""))}\\b`));
+  const numContext = numIdx >= 0
+    ? `\n\n--- mention of "${normSec}" found at offset ${numIdx} ---\n` +
+      plainText.slice(Math.max(0, numIdx - 200), numIdx + 500)
+    : `\n\n--- "${normSec}" was NOT found anywhere in the plain text ---`;
+
   return {
     found: false,
-    reason: `Section ${section} could not be located in the act text. The act page was retrieved (${Math.round(html.length / 1024)} KB) but section ${normSec} was not found. Check the section number or try viewing the act directly.`,
+    reason: `Section ${section} could not be located in the act text. The act page was retrieved (${Math.round(html.length / 1024)} KB → ${Math.round(plainText.length / 1024)} KB plain text) but section ${normSec} was not found.`,
     url: baseUrl,
+    debug: {
+      plainTextSample: plainText.slice(0, 1500) + numContext,
+      htmlLength: html.length,
+      plainTextLength: plainText.length,
+    },
   };
 }
 

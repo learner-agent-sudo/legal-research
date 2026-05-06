@@ -16,7 +16,7 @@ export type LookupRequest = {
 
 export type LookupResponse =
   | { ok: true;  found: true;  actName: string; actCode: string; section: string; text: string; url: string }
-  | { ok: true;  found: false; actName: string; actCode: string | null; reason: string; url: string | null }
+  | { ok: true;  found: false; actName: string; actCode: string | null; reason: string; url: string | null; debug?: { plainTextSample: string; htmlLength: number } }
   | { ok: false; error: string };
 
 export async function POST(req: NextRequest): Promise<NextResponse<LookupResponse>> {
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<LookupRespons
       actCode,
       reason: result.reason,
       url: result.url,
+      debug: result.debug,
     });
   }
 

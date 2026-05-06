@@ -9,7 +9,7 @@ type LookupState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "fetched"; sectionText: string; url: string; actCode: string }
-  | { status: "not-found"; reason: string; url: string | null }
+  | { status: "not-found"; reason: string; url: string | null; debug?: { plainTextSample: string; htmlLength: number; plainTextLength: number } }
   | { status: "error"; error: string };
 
 type VerifyState =
@@ -103,7 +103,7 @@ export default function CitationTestPage() {
         return;
       }
       if (!json.found) {
-        setLookups((s) => ({ ...s, [idx]: { status: "not-found", reason: json.reason, url: json.url } }));
+        setLookups((s) => ({ ...s, [idx]: { status: "not-found", reason: json.reason, url: json.url, debug: json.debug } }));
         return;
       }
       setLookups((s) => ({
@@ -308,6 +308,16 @@ export default function CitationTestPage() {
                         </>
                       )}
                     </p>
+                    {lookup.debug && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-[11px] font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                          Debug: what the server actually fetched ({Math.round(lookup.debug.htmlLength / 1024)} KB HTML / {Math.round(lookup.debug.plainTextLength / 1024)} KB text)
+                        </summary>
+                        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-[10px] text-slate-600 dark:bg-slate-950 dark:text-slate-400">
+                          {lookup.debug.plainTextSample}
+                        </pre>
+                      </details>
+                    )}
                   </div>
                 )}
 
