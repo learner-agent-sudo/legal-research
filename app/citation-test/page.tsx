@@ -80,6 +80,8 @@ export default function CitationTestPage() {
   const [lookups, setLookups] = useState<Record<number, LookupState>>({});
   const [verifies, setVerifies] = useState<Record<number, VerifyState>>({});
   const [selectedModel, setSelectedModel] = useState(0);
+  // Manually-pasted section text per-citation (fallback when live fetch fails)
+  const [manualText, setManualText] = useState<Record<number, string>>({});
 
   function handleExtract() {
     const result = extractCitations(text);
@@ -120,12 +122,20 @@ export default function CitationTestPage() {
 
   async function handleVerify(idx: number, c: ExtractedCitation) {
     const lookup = lookups[idx];
-    if (lookup?.status !== "fetched") return;
+    const manual = manualText[idx]?.trim();
+
+    // Allow verification with either fetched text OR manually-pasted text
+    const hasFetched = lookup?.status === "fetched";
+    const hasManual = manual && manual.length > 20;
+    if (!hasFetched && !hasManual) return;
 
     const preset = MODEL_PRESETS[selectedModel];
     const apiKey = typeof window !== "undefined"
       ? localStorage.getItem(preset.storageKey) ?? undefined
       : undefined;
+
+    const actCode =
+      lookup?.status === "fetched" ? lookup.actCode : undefined;
 
     setVerifies((s) => ({ ...s, [idx]: { status: "loading" } }));
     try {
@@ -136,8 +146,9 @@ export default function CitationTestPage() {
           jurisdiction: "ontario",
           act: c.act,
           section: c.section,
-          actCode: lookup.actCode,
+          actCode,
           claudeClaim: c.context,
+          manualSectionText: hasManual ? manual : undefined,
           model: {
             kind: preset.kind,
             baseUrl: preset.baseUrl,
@@ -298,22 +309,43 @@ export default function CitationTestPage() {
                 {lookup.status === "not-found" && (
                   <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
                     <p className="text-xs text-amber-700 dark:text-amber-400">
-                      ⚠ {lookup.reason}
+                      ⚠ Live fetch unavailable: ontario.ca/laws is a JavaScript-rendered site and can&apos;t be scraped server-side.
                       {lookup.url && (
                         <>
                           {" "}
-                          <a href={lookup.url} target="_blank" rel="noreferrer" className="underline">
-                            View act ↗
+                          <a href={lookup.url} target="_blank" rel="noreferrer" className="underline font-medium">
+                            Open the act on e-Laws ↗
                           </a>
                         </>
                       )}
                     </p>
+                    <p className="mt-2 text-xs text-slate-700 dark:text-slate-300">
+                      <span className="font-medium">Workaround:</span> open the link above in a new tab, find section{" "}
+                      <span className="font-mono">{c.section}</span>, copy the section text, and paste it below. The AI will
+                      then compare your pasted text against Claude&apos;s claim.
+                    </p>
+                    <textarea
+                      value={manualText[idx] ?? ""}
+                      onChange={(e) => setManualText((s) => ({ ...s, [idx]: e.target.value }))}
+                      placeholder={`Paste section ${c.section} text here…`}
+                      rows={6}
+                      className="mt-2 block w-full rounded-md border border-slate-300 bg-white p-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                    />
+                    {(manualText[idx]?.trim().length ?? 0) > 20 && (
+                      <button
+                        onClick={() => handleVerify(idx, c)}
+                        disabled={verify.status === "loading"}
+                        className="mt-2 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-60 dark:border-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+                      >
+                        {verify.status === "loading" ? "Verifying…" : "Verify pasted text with AI"}
+                      </button>
+                    )}
                     {lookup.debug && (
                       <details className="mt-2">
-                        <summary className="cursor-pointer text-[11px] font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-                          Debug: what the server actually fetched ({Math.round(lookup.debug.htmlLength / 1024)} KB HTML / {Math.round(lookup.debug.plainTextLength / 1024)} KB text)
+                        <summary className="cursor-pointer text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-400">
+                          Debug ({Math.round(lookup.debug.htmlLength / 1024)} KB HTML / {Math.round(lookup.debug.plainTextLength / 1024)} KB text)
                         </summary>
-                        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-[10px] text-slate-600 dark:bg-slate-950 dark:text-slate-400">
+                        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-2 text-[10px] text-slate-600 dark:bg-slate-950 dark:text-slate-400">
                           {lookup.debug.plainTextSample}
                         </pre>
                       </details>

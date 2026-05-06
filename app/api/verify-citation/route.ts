@@ -15,6 +15,10 @@ export type VerifyCitationRequest = {
   actCode?: string;             // optional override
   claudeClaim: string;          // the sentence(s) Claude wrote about this citation
 
+  // If provided, skips live-fetching and uses this text as the section content
+  // (for sources that can't be scraped server-side, e.g. JavaScript SPAs)
+  manualSectionText?: string;
+
   // Which model to use for the AI verification step
   model: {
     kind: "openai-compat" | "gemini";
@@ -58,30 +62,42 @@ export async function POST(req: NextRequest): Promise<NextResponse<VerifyCitatio
     );
   }
 
-  // ── Step 1: resolve act code ─────────────────────────────────────────────
+  // ── Step 1: resolve act code (only needed if we'll fetch) ───────────────
   const actCode = body.actCode ?? findOntarioAct(act)?.code ?? null;
-  if (!actCode) {
-    return NextResponse.json({
-      ok: true,
-      verdict: "not-found",
-      explanation: `Could not find "${act}" in the Ontario acts index. Verify the act name or provide actCode directly.`,
-      sectionText: null,
-      url: null,
-      actCode: null,
-    });
-  }
 
-  // ── Step 2: fetch live section text ─────────────────────────────────────
-  const lookup = await fetchOntarioSection(actCode, section);
-  if (!lookup.found) {
-    return NextResponse.json({
-      ok: true,
-      verdict: "not-found",
-      explanation: lookup.reason,
-      sectionText: null,
-      url: lookup.url,
-      actCode,
-    });
+  // ── Step 2: resolve section text — manual paste OR live fetch ───────────
+  let sectionText: string;
+  let sourceUrl: string;
+
+  if (body.manualSectionText && body.manualSectionText.trim().length > 20) {
+    sectionText = body.manualSectionText.trim();
+    sourceUrl = actCode
+      ? `https://www.ontario.ca/laws/statute/${actCode}`
+      : "user-provided text";
+  } else {
+    if (!actCode) {
+      return NextResponse.json({
+        ok: true,
+        verdict: "not-found",
+        explanation: `Could not find "${act}" in the Ontario acts index. Provide actCode directly, or paste the section text manually.`,
+        sectionText: null,
+        url: null,
+        actCode: null,
+      });
+    }
+    const lookup = await fetchOntarioSection(actCode, section);
+    if (!lookup.found) {
+      return NextResponse.json({
+        ok: true,
+        verdict: "not-found",
+        explanation: lookup.reason,
+        sectionText: null,
+        url: lookup.url,
+        actCode,
+      });
+    }
+    sectionText = lookup.text;
+    sourceUrl = lookup.url;
   }
 
   // ── Step 3: resolve API key ──────────────────────────────────────────────
@@ -104,8 +120,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<VerifyCitatio
     jurisdiction: `Ontario, Canada`,
     act,
     section,
-    sectionText: lookup.text,
-    sourceUrl: lookup.url,
+    sectionText,
+    sourceUrl,
     claudeClaim,
   });
 
@@ -139,8 +155,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<VerifyCitatio
     ok: true,
     verdict,
     explanation,
-    sectionText: lookup.text,
-    url: lookup.url,
+    sectionText,
+    url: sourceUrl,
     actCode,
   });
 }
