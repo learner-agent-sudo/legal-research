@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findOntarioAct } from "@/lib/citations/ontario-acts";
 import { fetchOntarioSection } from "@/lib/citations/ontario-parser";
+import { findHkCap } from "@/lib/citations/hk-caps";
+import { fetchHkSection } from "@/lib/citations/hk-parser";
 
 export const runtime = "nodejs";
-// Cache fetched sections in the Vercel edge cache for 7 days
-// (legislation rarely changes mid-year; revalidation is manual for now)
+// Cache fetched sections for 7 days (legislation rarely changes mid-year)
 export const revalidate = 604800;
 
 export type LookupRequest = {
-  jurisdiction: "ontario"; // extend later for "hk"
-  act: string;             // e.g. "Employment Standards Act, 2000"
-  section: string;         // e.g. "14(2)"
-  actCode?: string;        // optional override — skip name lookup
+  jurisdiction: "ontario" | "hk";
+  act: string;             // e.g. "Employment Standards Act, 2000" / "Employment Ordinance"
+  section: string;         // e.g. "14(2)" / "9(1)"
+  actCode?: string;        // optional override (Ontario: e-Laws code; HK: cap number)
 };
 
 export type LookupResponse =
   | { ok: true;  found: true;  actName: string; actCode: string; section: string; text: string; url: string }
-  | { ok: true;  found: false; actName: string; actCode: string | null; reason: string; url: string | null; debug?: { plainTextSample: string; htmlLength: number } }
+  | { ok: true;  found: false; actName: string; actCode: string | null; reason: string; url: string | null; debug?: unknown }
   | { ok: false; error: string };
 
 export async function POST(req: NextRequest): Promise<NextResponse<LookupResponse>> {
@@ -36,47 +37,52 @@ export async function POST(req: NextRequest): Promise<NextResponse<LookupRespons
     );
   }
 
-  if (jurisdiction !== "ontario") {
-    return NextResponse.json(
-      { ok: false, error: `Jurisdiction "${jurisdiction}" not yet supported. Only "ontario" is available.` },
-      { status: 400 }
-    );
-  }
-
-  // Resolve act code
-  const actCode = codeOverride ?? findOntarioAct(act)?.code ?? null;
-  if (!actCode) {
+  // ── Ontario ──────────────────────────────────────────────────────────────
+  if (jurisdiction === "ontario") {
+    const actCode = codeOverride ?? findOntarioAct(act)?.code ?? null;
+    if (!actCode) {
+      return NextResponse.json({
+        ok: true, found: false, actName: act, actCode: null,
+        reason: `Could not find "${act}" in the Ontario acts index. Try specifying actCode directly, or check the act name spelling.`,
+        url: null,
+      });
+    }
+    const result = await fetchOntarioSection(actCode, section);
+    if (!result.found) {
+      return NextResponse.json({
+        ok: true, found: false, actName: act, actCode,
+        reason: result.reason, url: result.url, debug: result.debug,
+      });
+    }
     return NextResponse.json({
-      ok: true,
-      found: false,
-      actName: act,
-      actCode: null,
-      reason: `Could not find "${act}" in the Ontario acts index. Try specifying actCode directly, or check the act name spelling.`,
-      url: null,
+      ok: true, found: true, actName: act, actCode, section, text: result.text, url: result.url,
     });
   }
 
-  const result = await fetchOntarioSection(actCode, section);
-
-  if (!result.found) {
+  // ── Hong Kong ─────────────────────────────────────────────────────────────
+  if (jurisdiction === "hk") {
+    const cap = codeOverride ?? findHkCap(act)?.cap ?? null;
+    if (!cap) {
+      return NextResponse.json({
+        ok: true, found: false, actName: act, actCode: null,
+        reason: `Could not find "${act}" in the HK caps index. Try specifying actCode as the Cap number (e.g. "57"), or check the ordinance name spelling.`,
+        url: null,
+      });
+    }
+    const result = await fetchHkSection(cap, section);
+    if (!result.found) {
+      return NextResponse.json({
+        ok: true, found: false, actName: act, actCode: cap,
+        reason: result.reason, url: result.url, debug: result.debug,
+      });
+    }
     return NextResponse.json({
-      ok: true,
-      found: false,
-      actName: act,
-      actCode,
-      reason: result.reason,
-      url: result.url,
-      debug: result.debug,
+      ok: true, found: true, actName: act, actCode: cap, section, text: result.text, url: result.url,
     });
   }
 
-  return NextResponse.json({
-    ok: true,
-    found: true,
-    actName: act,
-    actCode,
-    section,
-    text: result.text,
-    url: result.url,
-  });
+  return NextResponse.json(
+    { ok: false, error: `Jurisdiction "${jurisdiction}" is not supported. Use "ontario" or "hk".` },
+    { status: 400 }
+  );
 }
