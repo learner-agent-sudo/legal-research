@@ -34,6 +34,7 @@ import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
 import { saveSession, updateSession, type Session } from "@/lib/history";
 import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
+import { VerdictScoreboard, cardAnchorId, type ScoreboardEntry } from "@/components/VerdictScoreboard";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -961,6 +962,7 @@ export default function HomePage() {
           return (
             <div
               key={id}
+              id={cardAnchorId(id)}
               className={`rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-800 sm:p-4 ${
                 r.status === "ok" ? style.card : "bg-white dark:bg-slate-900"
               }`}
@@ -1033,6 +1035,15 @@ export default function HomePage() {
 
         const okCount = doneIds.filter((id) => results[id]?.status === "ok").length;
 
+        const scoreboardEntries: ScoreboardEntry[] = doneIds
+          .filter((id) => results[id]?.status === "ok")
+          .map((id) => {
+            const model = allModels.find((m) => m.id === id);
+            const r = results[id];
+            const verdict = r?.status === "ok" ? parseVerdict(r.text).verdict : "none";
+            return { id, label: model?.label ?? id, verdict };
+          });
+
         return (
           <section className="space-y-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-800">
@@ -1046,6 +1057,7 @@ export default function HomePage() {
                 {okCount} answered · {errorIds.length} failed · {orderedIds.length} total
               </p>
             </div>
+            <VerdictScoreboard entries={scoreboardEntries} />
             {loadingIds.map(renderCard)}
             {nonGreenDoneIds.map(renderCard)}
             {greenDoneIds.length > 0 && (
