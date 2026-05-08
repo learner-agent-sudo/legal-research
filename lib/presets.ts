@@ -83,6 +83,7 @@ export const PROVIDER_KEY_NAMES: Record<string, string> = {
   openrouter: "OpenRouter API key",
   gemini: "Google Gemini API key",
   mistral: "Mistral API key",
+  canlii: "CanLII API key (Canadian case law & legislation)",
 };
 
 export const PROVIDER_SIGNUP_URLS: Record<string, string> = {
@@ -90,4 +91,5 @@ export const PROVIDER_SIGNUP_URLS: Record<string, string> = {
   openrouter: "https://openrouter.ai/keys",
   gemini: "https://aistudio.google.com/apikey",
   mistral: "https://console.mistral.ai/api-keys/",
+  canlii: "https://www.canlii.org/en/info/api.html",
 };

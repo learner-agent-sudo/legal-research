@@ -25,7 +25,7 @@ import {
 import { clearHistory, listSessions } from "@/lib/history";
 import { useToast } from "@/components/Toast";
 
-const KNOWN_PROVIDERS = ["groq", "openrouter", "gemini", "mistral"];
+const KNOWN_PROVIDERS = ["groq", "openrouter", "gemini", "mistral", "canlii"];
 
 type SyncState =
   | { status: "idle" }

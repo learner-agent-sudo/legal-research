@@ -95,6 +95,33 @@ const PROVIDERS: ProviderDef[] = [
       }
     },
   },
+  {
+    provider: "canlii",
+    label: "CanLII (data source)",
+    // CanLII API has no CORS headers, so we proxy via a server route.
+    ping: async (key) => {
+      const t0 = Date.now();
+      try {
+        const res = await fetch("/api/canlii/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey: key }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean; detail?: string; ms?: number;
+        };
+        const ms = json.ms ?? Date.now() - t0;
+        return {
+          ok: Boolean(json.ok),
+          detail: json.detail ?? `HTTP ${res.status}`,
+          ms,
+        };
+      } catch (e) {
+        return { ok: false, detail: e instanceof Error ? e.message : String(e), ms: Date.now() - t0 };
+      }
+    },
+  },
 ];
 
 export function ProviderPings() {
