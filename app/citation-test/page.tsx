@@ -18,6 +18,13 @@ type VerifyState =
   | { status: "done"; verdict: string; explanation: string }
   | { status: "error"; error: string };
 
+type CanLIIHit = { title: string; citation: string; url: string };
+
+type CanLIIState =
+  | { status: "loading" }
+  | { status: "ok"; hits: CanLIIHit[] }
+  | { status: "error"; message: string };
+
 type ModelPreset = {
   label: string;
   kind: "openai-compat" | "gemini";
@@ -82,6 +89,63 @@ export default function CitationTestPage() {
   const [selectedModel, setSelectedModel] = useState(0);
   // Manually-pasted section text per-citation (fallback when live fetch fails)
   const [manualText, setManualText] = useState<Record<number, string>>({});
+  // CanLII search state per-citation (independent of the main lookup)
+  const [canliiState, setCanliiState] = useState<Record<number, CanLIIState>>({});
+
+  async function handleCanLIISearch(idx: number, c: ExtractedCitation) {
+    const apiKey =
+      typeof window !== "undefined"
+        ? (() => {
+            try {
+              const raw = window.localStorage.getItem("lr.apiKeys.v1");
+              const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+              return map.canlii?.trim() ?? "";
+            } catch {
+              return "";
+            }
+          })()
+        : "";
+
+    if (!apiKey) {
+      setCanliiState((s) => ({
+        ...s,
+        [idx]: { status: "error", message: "No CanLII API key — add one in Settings." },
+      }));
+      return;
+    }
+
+    setCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
+
+    try {
+      const res = await fetch("/api/canlii/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "legislation",
+          query: c.act,
+          jurisdiction: "ontario",
+          apiKey,
+        }),
+      });
+      const json = (await res.json()) as
+        | { ok: true; hits: { title: string; citation: string; url: string }[]; totalCount: number }
+        | { ok: false; errorKind?: string; message?: string; error?: string };
+
+      if (!json.ok) {
+        setCanliiState((s) => ({
+          ...s,
+          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed." },
+        }));
+        return;
+      }
+      setCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits } }));
+    } catch (err) {
+      setCanliiState((s) => ({
+        ...s,
+        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err) },
+      }));
+    }
+  }
 
   function handleExtract() {
     const result = extractCitations(text);
@@ -324,6 +388,59 @@ export default function CitationTestPage() {
                       <span className="font-mono">{c.section}</span>, copy the section text, and paste it below. The AI will
                       then compare your pasted text against Claude&apos;s claim.
                     </p>
+
+                    {/* CanLII alternative source */}
+                    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900/50">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                          Or try CanLII:
+                        </span>
+                        <button
+                          onClick={() => handleCanLIISearch(idx, c)}
+                          disabled={canliiState[idx]?.status === "loading"}
+                          className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+                        >
+                          {canliiState[idx]?.status === "loading"
+                            ? "Searching CanLII…"
+                            : "Search CanLII"}
+                        </button>
+                      </div>
+                      {canliiState[idx]?.status === "error" && (
+                        <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                          ⚠ {canliiState[idx]?.status === "error" && (canliiState[idx] as { message: string }).message}
+                        </p>
+                      )}
+                      {canliiState[idx]?.status === "ok" && (
+                        <div className="mt-1.5">
+                          {(canliiState[idx] as { hits: CanLIIHit[] }).hits.length === 0 ? (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              No matching legislation found on CanLII.
+                            </p>
+                          ) : (
+                            <ul className="space-y-1">
+                              {(canliiState[idx] as { hits: CanLIIHit[] }).hits.slice(0, 5).map((h, i) => (
+                                <li key={i} className="text-[11px]">
+                                  <a
+                                    href={h.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                  >
+                                    {h.title}
+                                  </a>
+                                  {h.citation && (
+                                    <span className="ml-1 text-slate-500 dark:text-slate-400">
+                                      · {h.citation}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <textarea
                       value={manualText[idx] ?? ""}
                       onChange={(e) => setManualText((s) => ({ ...s, [idx]: e.target.value }))}
