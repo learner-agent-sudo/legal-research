@@ -21,6 +21,7 @@ import {
   type RoleMap,
 } from "@/lib/storage";
 import { useToast } from "@/components/Toast";
+import { VerdictScoreboard, cardAnchorId, type ScoreboardEntry } from "@/components/VerdictScoreboard";
 
 type Verdict = "green" | "yellow" | "red" | "none";
 
@@ -356,7 +357,7 @@ function ExpandedSession({
             (a) => a.challengerId === r.modelId
           );
           return (
-            <div key={i} className={`rounded-lg border p-3 ${cardStyle}`}>
+            <div key={i} id={cardAnchorId(r.modelId)} className={`rounded-lg border p-3 ${cardStyle}`}>
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{r.modelLabel}</span>
                 {r.status === "ok" && verdict !== "none" && (
@@ -421,8 +422,17 @@ function ExpandedSession({
           );
         };
 
+        const scoreboardEntries: ScoreboardEntry[] = displayResults
+          .filter((r) => r.status === "ok")
+          .map((r) => ({
+            id: r.modelId,
+            label: r.modelLabel,
+            verdict: ((r.verdict ?? "none") as Verdict),
+          }));
+
         return (
           <div className="space-y-3">
+            <VerdictScoreboard entries={scoreboardEntries} />
             {nonGreenResults.map((r, i) => renderResult(r, i))}
             {greenResults.length > 0 && (
               <details className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
