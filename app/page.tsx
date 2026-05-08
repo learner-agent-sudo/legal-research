@@ -34,7 +34,7 @@ import { pullFromServer, pushSnapshot, writeLocalSnapshot } from "@/lib/sync";
 import { saveSession, updateSession, type Session } from "@/lib/history";
 import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
-import { VerdictScoreboard, cardAnchorId, type ScoreboardEntry } from "@/components/VerdictScoreboard";
+import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -1040,8 +1040,13 @@ export default function HomePage() {
           .map((id) => {
             const model = allModels.find((m) => m.id === id);
             const r = results[id];
-            const verdict = r?.status === "ok" ? parseVerdict(r.text).verdict : "none";
-            return { id, label: model?.label ?? id, verdict };
+            const parsed = r?.status === "ok" ? parseVerdict(r.text) : null;
+            return {
+              id,
+              label: model?.label ?? id,
+              verdict: parsed?.verdict ?? "none",
+              excerpt: parsed ? extractExcerpt(parsed.body) : undefined,
+            };
           });
 
         return (

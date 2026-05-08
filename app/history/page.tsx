@@ -21,7 +21,7 @@ import {
   type RoleMap,
 } from "@/lib/storage";
 import { useToast } from "@/components/Toast";
-import { VerdictScoreboard, cardAnchorId, type ScoreboardEntry } from "@/components/VerdictScoreboard";
+import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
 
 type Verdict = "green" | "yellow" | "red" | "none";
 
@@ -427,7 +427,8 @@ function ExpandedSession({
           .map((r) => ({
             id: r.modelId,
             label: r.modelLabel,
-            verdict: ((r.verdict ?? "none") as Verdict),
+            verdict: (r.verdict ?? "none") as Verdict,
+            excerpt: r.text ? extractExcerpt(r.text.replace(/^\[(GREEN|YELLOW|RED)\]\s*/i, "")) : undefined,
           }));
 
         return (
