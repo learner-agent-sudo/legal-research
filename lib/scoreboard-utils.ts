@@ -20,8 +20,8 @@ export function extractExcerpt(body: string): string {
       .trim();
     if (clean.length < 20) continue;
     const firstSentence =
-      clean.match(/^.{20,160}?[.!?](?:\s|$)/)?.[0]?.trim() ??
-      clean.slice(0, 160);
+      clean.match(/^.{40,240}?[.!?](?:\s|$)/)?.[0]?.trim() ??
+      clean.slice(0, 240);
     return firstSentence.length < clean.length
       ? firstSentence + "…"
       : firstSentence;

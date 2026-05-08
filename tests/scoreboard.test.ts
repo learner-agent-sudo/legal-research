@@ -31,17 +31,17 @@ describe("extractExcerpt", () => {
     expect(result).toContain("disagrees");
   });
 
-  it("truncates at sentence boundary within 160 chars", () => {
-    const long = "The answer is wrong because it cites section 14 when in fact the correct section is 15 and this makes the whole argument invalid. More text follows here.";
+  it("truncates at sentence boundary within 240 chars", () => {
+    const long = "The answer is wrong because it cites section 14 when in fact the correct section is 15 and this makes the whole argument invalid because the statute clearly distinguishes between the two. More text follows here.";
     const result = extractExcerpt(long);
-    expect(result.length).toBeLessThanOrEqual(165); // 160 + ellipsis
+    expect(result.length).toBeLessThanOrEqual(245); // 240 + ellipsis
     expect(result).toMatch(/[.!?…]$/);
   });
 
-  it("truncates to 160 chars when no sentence boundary found", () => {
-    const noStop = "a".repeat(200);
+  it("truncates to 240 chars when no sentence boundary found", () => {
+    const noStop = "a".repeat(300);
     const result = extractExcerpt(noStop);
-    expect(result.length).toBeLessThanOrEqual(163); // 160 + "…"
+    expect(result.length).toBeLessThanOrEqual(243); // 240 + "…"
   });
 
   it("skips lines shorter than 20 chars", () => {

@@ -35,6 +35,8 @@ import { saveSession, updateSession, type Session } from "@/lib/history";
 import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
 import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
+import { ConsolidatePanel } from "@/components/ConsolidatePanel";
+import type { ConsolidationCritique } from "@/lib/prompts";
 
 const ROLE_OPTIONS: VerificationRole[] = [
   "comprehensive",
@@ -1049,6 +1051,21 @@ export default function HomePage() {
             };
           });
 
+        const consolidationCritiques: ConsolidationCritique[] = doneIds
+          .map((id) => {
+            const model = allModels.find((m) => m.id === id);
+            const r = results[id];
+            if (!model || r?.status !== "ok") return null;
+            const parsed = parseVerdict(r.text);
+            if (parsed.verdict !== "red" && parsed.verdict !== "yellow") return null;
+            return {
+              modelLabel: model.label,
+              verdict: parsed.verdict,
+              body: parsed.body,
+            };
+          })
+          .filter((c): c is ConsolidationCritique => c !== null);
+
         return (
           <section className="space-y-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-800">
@@ -1063,6 +1080,16 @@ export default function HomePage() {
               </p>
             </div>
             <VerdictScoreboard entries={scoreboardEntries} />
+            {consolidationCritiques.length >= 2 && (
+              <ConsolidatePanel
+                critiques={consolidationCritiques}
+                claudeAnswer={claudeAnswer}
+                documentText={documentText}
+                userQuestion={userQuestion}
+                availableModels={allModels}
+                apiKeys={apiKeys}
+              />
+            )}
             {loadingIds.map(renderCard)}
             {nonGreenDoneIds.map(renderCard)}
             {greenDoneIds.length > 0 && (

@@ -2,10 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   buildPromptForRole,
   buildAdjudicationPrompt,
+  buildConsolidationPrompt,
   ROLE_TEMPLATES,
   ROLE_LABELS,
   ROLE_DESCRIPTIONS,
   VerificationRole,
+  type ConsolidationCritique,
 } from "@/lib/prompts";
 
 const ROLES: VerificationRole[] = ["comprehensive", "statute", "case-law", "logic", "counter"];
@@ -228,5 +230,87 @@ describe("buildAdjudicationPrompt", () => {
     });
     expect(prompt).toContain("b".repeat(60000));
     expect(prompt).not.toContain("b".repeat(60001));
+  });
+});
+
+// ── buildConsolidationPrompt ──────────────────────────────────────────────────
+
+describe("buildConsolidationPrompt", () => {
+  const SAMPLE_CRITIQUES: ConsolidationCritique[] = [
+    {
+      modelLabel: "Llama 3.3 70B",
+      verdict: "red",
+      body: "The cited section number is wrong. Section 14 does not exist in the act.",
+    },
+    {
+      modelLabel: "Gemini 2.5 Flash",
+      verdict: "yellow",
+      body: "The reasoning is mostly sound but misses the exception in section 15.",
+    },
+  ];
+
+  const ARGS = {
+    claudeAnswer: "Section 14 of the ESA requires X.",
+    documentText: "Section 13 talks about Y.",
+    userQuestion: "Does the ESA require X?",
+    critiques: SAMPLE_CRITIQUES,
+  };
+
+  it("includes all severity tags in instructions", () => {
+    const p = buildConsolidationPrompt(ARGS);
+    expect(p).toContain("[CRITICAL]");
+    expect(p).toContain("[MODERATE]");
+    expect(p).toContain("[MINOR]");
+  });
+
+  it("includes each critique's model label and uppercased verdict", () => {
+    const p = buildConsolidationPrompt(ARGS);
+    expect(p).toContain("Llama 3.3 70B");
+    expect(p).toContain("[RED]");
+    expect(p).toContain("Gemini 2.5 Flash");
+    expect(p).toContain("[YELLOW]");
+  });
+
+  it("includes each critique's body text", () => {
+    const p = buildConsolidationPrompt(ARGS);
+    expect(p).toContain("Section 14 does not exist");
+    expect(p).toContain("misses the exception");
+  });
+
+  it("includes the answer, document, and question", () => {
+    const p = buildConsolidationPrompt(ARGS);
+    expect(p).toContain("Section 14 of the ESA requires X.");
+    expect(p).toContain("Section 13 talks about Y.");
+    expect(p).toContain("Does the ESA require X?");
+  });
+
+  it("uses fallback when userQuestion is omitted", () => {
+    const p = buildConsolidationPrompt({ ...ARGS, userQuestion: undefined });
+    expect(p).toContain("[no question provided]");
+  });
+
+  it("includes the count of models in the section heading", () => {
+    const p = buildConsolidationPrompt(ARGS);
+    expect(p).toContain("(2 models)");
+  });
+
+  it("works with a single critique", () => {
+    const p = buildConsolidationPrompt({ ...ARGS, critiques: SAMPLE_CRITIQUES.slice(0, 1) });
+    expect(p).toContain("(1 models)");
+    expect(p).toContain("Llama 3.3 70B");
+  });
+
+  it("instructs the model to group by theme not by model", () => {
+    const p = buildConsolidationPrompt(ARGS);
+    expect(p.toLowerCase()).toContain("by theme");
+  });
+
+  it("truncates very long documentText", () => {
+    const p = buildConsolidationPrompt({
+      ...ARGS,
+      documentText: "x".repeat(80000),
+    });
+    expect(p).toContain("x".repeat(60000));
+    expect(p).not.toContain("x".repeat(60001));
   });
 });

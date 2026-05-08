@@ -210,3 +210,69 @@ Provide:
 3. Anything the Challenger got materially wrong (e.g. fabricated counter-citations, misread the document).
 4. One-sentence bottom line: should the user trust the Author's original answer, the Challenger's critique, or neither?`;
 }
+
+// ---------- Consolidation (synthesise multiple critiques) ----------
+
+export type ConsolidationCritique = {
+  modelLabel: string;          // e.g. "Llama 3.3 70B (Groq, free)"
+  verdict: "red" | "yellow";   // only red/yellow are sent for consolidation
+  body: string;                // the markdown body of the critique (without the verdict tag)
+};
+
+export type BuildConsolidationArgs = BuildPromptArgs & {
+  critiques: ConsolidationCritique[];
+};
+
+export function buildConsolidationPrompt(args: BuildConsolidationArgs): string {
+  const userQuestion = args.userQuestion?.trim() || "[no question provided]";
+  const claudeAnswer = args.claudeAnswer.trim();
+  const documentText =
+    args.documentText?.trim().slice(0, MAX_DOC_CHARS) || "[no document attached]";
+
+  const critiquesBlock = args.critiques
+    .map(
+      (c, i) =>
+        `### Critique ${i + 1} — ${c.modelLabel} [${c.verdict.toUpperCase()}]\n` +
+        `"""\n${c.body.trim()}\n"""`
+    )
+    .join("\n\n");
+
+  return `You are consolidating multiple AI critiques of the same legal answer into a single, structured report.
+
+Several AI models reviewed the answer below and flagged concerns (verdicts [RED] = major issues, [YELLOW] = some concerns). Your job is to merge their concerns by theme — NOT model-by-model — so the user sees the unique issues that were raised, who raised them, and how serious each one is.
+
+Format requirement: your VERY FIRST line must be exactly one of these tags, on its own line:
+[CRITICAL] — at least one severe issue is corroborated by multiple models
+[MODERATE] — concerns exist but are mixed in severity or partially disputed
+[MINOR] — only small or stylistic concerns; the answer largely holds up
+Then leave a blank line and write the report in Markdown.
+
+${HONESTY_RULE}
+
+Original question:
+${userQuestion}
+
+Answer being reviewed:
+"""
+${claudeAnswer}
+"""
+
+Reference document:
+"""
+${documentText}
+"""
+
+Individual critiques (${args.critiques.length} models):
+
+${critiquesBlock}
+
+Provide:
+1. **Issues by theme** — list each distinct issue once, with:
+   - Short heading describing the issue
+   - Severity: critical / moderate / minor
+   - Which model(s) flagged it (use the labels above)
+   - One-sentence summary of what they said
+2. **Contradictions** — any place where two models disagreed about a fact or interpretation.
+3. **Things to verify first** — the 1-3 highest-priority items the user should check before relying on the answer.
+4. **Bottom line** — one sentence: should the user trust the answer as-is, fix specific parts, or rewrite it.`;
+}
