@@ -36,6 +36,7 @@ import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
 import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
 import { ConsolidatePanel } from "@/components/ConsolidatePanel";
+import { AmberSummaryPanel } from "@/components/AmberSummaryPanel";
 import type { ConsolidationCritique } from "@/lib/prompts";
 
 const ROLE_OPTIONS: VerificationRole[] = [
@@ -1080,7 +1081,8 @@ export default function HomePage() {
               </p>
             </div>
             <VerdictScoreboard entries={scoreboardEntries} />
-            {consolidationCritiques.length >= 2 && (
+            <AmberSummaryPanel critiques={consolidationCritiques} />
+            {consolidationCritiques.length >= 1 && (
               <ConsolidatePanel
                 critiques={consolidationCritiques}
                 claudeAnswer={claudeAnswer}

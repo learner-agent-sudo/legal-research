@@ -324,13 +324,20 @@ export default function CitationTestPage() {
                       Section <span className="font-mono">{c.section}</span> · Ontario
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleLookup(idx, c)}
                       disabled={lookup.status === "loading"}
                       className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
                     >
                       {lookup.status === "loading" ? "Fetching…" : "1. Fetch live text"}
+                    </button>
+                    <button
+                      onClick={() => handleCanLIISearch(idx, c)}
+                      disabled={canliiState[idx]?.status === "loading"}
+                      className="rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
+                    >
+                      {canliiState[idx]?.status === "loading" ? "Searching CanLII…" : "Search CanLII"}
                     </button>
                     {lookup.status === "fetched" && (
                       <button
@@ -349,6 +356,45 @@ export default function CitationTestPage() {
                   <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Claude&apos;s claim</span>
                   <p className="mt-0.5 text-xs italic text-slate-600 dark:text-slate-400">{c.context}</p>
                 </div>
+
+                {/* CanLII results — shown whenever a search has been run */}
+                {canliiState[idx] && (
+                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">CanLII results</span>
+                    {canliiState[idx]?.status === "loading" && (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Searching CanLII…</p>
+                    )}
+                    {canliiState[idx]?.status === "error" && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                        ⚠ {(canliiState[idx] as { status: "error"; message: string }).message}
+                      </p>
+                    )}
+                    {canliiState[idx]?.status === "ok" && (() => {
+                      const hits = (canliiState[idx] as { status: "ok"; hits: CanLIIHit[] }).hits;
+                      return hits.length === 0 ? (
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">No matching legislation found on CanLII.</p>
+                      ) : (
+                        <ul className="mt-1.5 space-y-1">
+                          {hits.slice(0, 5).map((h, i) => (
+                            <li key={i} className="text-[11px]">
+                              <a
+                                href={h.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                {h.title}
+                              </a>
+                              {h.citation && (
+                                <span className="ml-1 text-slate-500 dark:text-slate-400">· {h.citation}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {/* Lookup result */}
                 {lookup.status === "fetched" && (
@@ -388,58 +434,6 @@ export default function CitationTestPage() {
                       <span className="font-mono">{c.section}</span>, copy the section text, and paste it below. The AI will
                       then compare your pasted text against Claude&apos;s claim.
                     </p>
-
-                    {/* CanLII alternative source */}
-                    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900/50">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                          Or try CanLII:
-                        </span>
-                        <button
-                          onClick={() => handleCanLIISearch(idx, c)}
-                          disabled={canliiState[idx]?.status === "loading"}
-                          className="rounded-md border border-blue-300 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
-                        >
-                          {canliiState[idx]?.status === "loading"
-                            ? "Searching CanLII…"
-                            : "Search CanLII"}
-                        </button>
-                      </div>
-                      {canliiState[idx]?.status === "error" && (
-                        <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">
-                          ⚠ {canliiState[idx]?.status === "error" && (canliiState[idx] as { message: string }).message}
-                        </p>
-                      )}
-                      {canliiState[idx]?.status === "ok" && (
-                        <div className="mt-1.5">
-                          {(canliiState[idx] as { hits: CanLIIHit[] }).hits.length === 0 ? (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                              No matching legislation found on CanLII.
-                            </p>
-                          ) : (
-                            <ul className="space-y-1">
-                              {(canliiState[idx] as { hits: CanLIIHit[] }).hits.slice(0, 5).map((h, i) => (
-                                <li key={i} className="text-[11px]">
-                                  <a
-                                    href={h.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                  >
-                                    {h.title}
-                                  </a>
-                                  {h.citation && (
-                                    <span className="ml-1 text-slate-500 dark:text-slate-400">
-                                      · {h.citation}
-                                    </span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      )}
-                    </div>
 
                     <textarea
                       value={manualText[idx] ?? ""}
