@@ -15,13 +15,19 @@ import {
   type SessionSummary,
 } from "@/lib/history";
 import {
+  loadApiKeys,
+  loadCustomModels,
   saveDraft,
   saveModelRoles,
   saveSelectedModels,
   type RoleMap,
 } from "@/lib/storage";
+import { BUILTIN_PRESETS, type ModelPreset } from "@/lib/presets";
 import { useToast } from "@/components/Toast";
 import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
+import { AmberSummaryPanel } from "@/components/AmberSummaryPanel";
+import { ConsolidatePanel } from "@/components/ConsolidatePanel";
+import type { ConsolidationCritique } from "@/lib/prompts";
 
 type Verdict = "green" | "yellow" | "red" | "none";
 
@@ -68,8 +74,13 @@ export default function HistoryPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [filter, setFilter] = useState("");
   const [expanded, setExpanded] = useState<Record<string, ExpandedEntry>>({});
+  const [allModels, setAllModels] = useState<ModelPreset[]>(BUILTIN_PRESETS);
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    setApiKeys(loadApiKeys());
+    const custom = loadCustomModels();
+    setAllModels([...BUILTIN_PRESETS, ...custom]);
     void fetchList();
   }, []);
 
@@ -288,6 +299,8 @@ export default function HistoryPage() {
                         <ExpandedSession
                           session={entry.session}
                           onRestore={() => handleRestore(entry.session!)}
+                          allModels={allModels}
+                          apiKeys={apiKeys}
                         />
                       )}
                     </div>
@@ -305,9 +318,13 @@ export default function HistoryPage() {
 function ExpandedSession({
   session,
   onRestore,
+  allModels,
+  apiKeys,
 }: {
   session: Session;
   onRestore: () => void;
+  allModels: ModelPreset[];
+  apiKeys: Record<string, string>;
 }) {
   return (
     <div className="space-y-4 p-3 sm:p-4">
@@ -431,9 +448,28 @@ function ExpandedSession({
             excerpt: r.text ? extractExcerpt(r.text.replace(/^\[(GREEN|YELLOW|RED)\]\s*/i, "")) : undefined,
           }));
 
+        const consolidationCritiques: ConsolidationCritique[] = displayResults
+          .filter((r) => r.status === "ok" && (r.verdict === "red" || r.verdict === "yellow"))
+          .map((r) => ({
+            modelLabel: r.modelLabel,
+            verdict: r.verdict as "red" | "yellow",
+            body: r.text ? r.text.replace(/^\[(GREEN|YELLOW|RED)\]\s*/i, "") : "",
+          }));
+
         return (
           <div className="space-y-3">
             <VerdictScoreboard entries={scoreboardEntries} />
+            <AmberSummaryPanel critiques={consolidationCritiques} />
+            {consolidationCritiques.length >= 1 && (
+              <ConsolidatePanel
+                critiques={consolidationCritiques}
+                claudeAnswer={session.claudeAnswer}
+                documentText={session.documentText}
+                userQuestion={session.userQuestion}
+                availableModels={allModels}
+                apiKeys={apiKeys}
+              />
+            )}
             {nonGreenResults.map((r, i) => renderResult(r, i))}
             {greenResults.length > 0 && (
               <details className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">

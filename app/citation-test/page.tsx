@@ -130,13 +130,25 @@ export default function CitationTestPage() {
 
     setCaseCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
 
+    // Build a cleaner search query: extract one distinctive word from each party
+    // e.g. "Honda Canada Inc. v. Keays" → "Honda Keays"
+    const parts = c.caseName.split(/\sv\.?\s/i);
+    const pickWord = (side: string) => {
+      const words = side.trim().split(/\s+/);
+      const meaningful = words.filter(
+        (w) => w.length > 2 && !/^(Inc|Ltd|Corp|Co|The|Of|And|For|v|vs|Her|His|Majesty|Queen|King|Crown|Attorney|General|AG|R)\.?$/i.test(w)
+      );
+      return meaningful[0] ?? words[0];
+    };
+    const queryTerms = parts.map(pickWord).filter(Boolean).join(" ");
+
     try {
       const res = await fetch("/api/canlii/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "case",
-          query: c.caseName,
+          query: queryTerms,
           apiKey,
         }),
       });
