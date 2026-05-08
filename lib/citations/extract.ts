@@ -99,3 +99,66 @@ function extractContext(text: string, start: number, length: number): string {
   if (ctxEnd < text.length) ctx = ctx + "…";
   return ctx;
 }
+
+// ── Case-law citations ──────────────────────────────────────────────────────
+
+export type ExtractedCaseCitation = {
+  caseName: string;     // "Smith v Jones"
+  citation: string;     // "[2019] ONCA 123" or "" if not detected
+  rawMatch: string;
+  context: string;
+};
+
+/**
+ * Extract case-law citations: "Plaintiff v Defendant" plus an optional citation
+ * block in the next ~100 chars.
+ *
+ * Detected citation forms:
+ *   [2019] ONCA 123          (year-bracketed neutral)
+ *   2019 ONCA 123            (year-first neutral)
+ *   (2019), 50 OR (3d) 1     (parallel)
+ *   [1932] AC 562            (UK / older)
+ */
+export function extractCaseCitations(text: string): ExtractedCaseCitation[] {
+  if (!text || text.length < 4) return [];
+
+  const found: ExtractedCaseCitation[] = [];
+  const seen = new Set<string>();
+
+  // "X v Y" — capitalised word(s) on each side, allow common connectors
+  const nameRe =
+    /\b([A-Z][\w.'-]+(?:\s+(?:[A-Z][\w.'-]+|of|the|and))*)\s+v\.?\s+([A-Z][\w.'-]+(?:\s+(?:[A-Z][\w.'-]+|of|the|and))*)\b/g;
+
+  // Match a citation immediately after the name (with optional comma/spaces)
+  const citRe =
+    /^[,\s]*((?:\[\d{4}\]\s+[A-Z][A-Z\d]*[A-Za-z]*(?:\s*\([^)]+\))?\s+\d+|\d{4}\s+[A-Z][A-Z\d]+(?:\s*\([^)]+\))?\s+\d+|\(\d{4}\),?\s+\d+[^.;\n]{0,40}?\d+(?:\s*\([A-Z][^)]*\))?))/;
+
+  for (const m of text.matchAll(nameRe)) {
+    const left = m[1].trim().replace(/\s+/g, " ");
+    const right = m[2].trim().replace(/\s+/g, " ");
+    // Filter obvious noise: each side should have a real name token
+    if (left.length < 2 || right.length < 2) continue;
+    // Don't accept names that are just stop-words
+    if (/^(?:and|of|the|for)$/i.test(left) || /^(?:and|of|the|for)$/i.test(right)) continue;
+
+    const caseName = `${left} v ${right}`;
+    const key = caseName.toLowerCase();
+    if (seen.has(key)) continue;
+
+    const start = m.index ?? 0;
+    const after = text.slice(start + m[0].length, start + m[0].length + 120);
+    const citMatch = after.match(citRe);
+    const citation = citMatch ? citMatch[1].trim() : "";
+    const fullLength = m[0].length + (citMatch ? citMatch[0].length : 0);
+
+    seen.add(key);
+    found.push({
+      caseName,
+      citation,
+      rawMatch: text.slice(start, start + fullLength).trim(),
+      context: extractContext(text, start, fullLength),
+    });
+  }
+
+  return found;
+}

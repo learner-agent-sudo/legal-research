@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { extractCitations, type ExtractedCitation } from "@/lib/citations/extract";
+import {
+  extractCitations,
+  extractCaseCitations,
+  type ExtractedCitation,
+  type ExtractedCaseCitation,
+} from "@/lib/citations/extract";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -77,13 +82,20 @@ Pursuant to s. 96(1) of the Labour Relations Act, 1995, an employee may file a c
 
 The Human Rights Code prohibits discrimination on enumerated grounds (see section 5).
 
-Under section 4 of the Limitations Act, 2002, the basic limitation period is two years.`;
+Under section 4 of the Limitations Act, 2002, the basic limitation period is two years.
+
+In Honda Canada Inc. v. Keays, 2008 SCC 39, the Supreme Court rejected Wallace damages.
+
+See also Bhasin v Hrynew, 2014 SCC 71, on the duty of honest performance.
+
+The classic English authority is Donoghue v Stevenson [1932] AC 562.`;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function CitationTestPage() {
   const [text, setText] = useState(SAMPLE_TEXT);
   const [citations, setCitations] = useState<ExtractedCitation[]>([]);
+  const [caseCitations, setCaseCitations] = useState<ExtractedCaseCitation[]>([]);
   const [lookups, setLookups] = useState<Record<number, LookupState>>({});
   const [verifies, setVerifies] = useState<Record<number, VerifyState>>({});
   const [selectedModel, setSelectedModel] = useState(0);
@@ -91,6 +103,62 @@ export default function CitationTestPage() {
   const [manualText, setManualText] = useState<Record<number, string>>({});
   // CanLII search state per-citation (independent of the main lookup)
   const [canliiState, setCanliiState] = useState<Record<number, CanLIIState>>({});
+  // CanLII search state for case citations (separate index space)
+  const [caseCanliiState, setCaseCanliiState] = useState<Record<number, CanLIIState>>({});
+
+  async function handleCaseCanLIISearch(idx: number, c: ExtractedCaseCitation) {
+    const apiKey =
+      typeof window !== "undefined"
+        ? (() => {
+            try {
+              const raw = window.localStorage.getItem("lr.apiKeys.v1");
+              const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+              return map.canlii?.trim() ?? "";
+            } catch {
+              return "";
+            }
+          })()
+        : "";
+
+    if (!apiKey) {
+      setCaseCanliiState((s) => ({
+        ...s,
+        [idx]: { status: "error", message: "No CanLII API key — add one in Settings." },
+      }));
+      return;
+    }
+
+    setCaseCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
+
+    try {
+      const res = await fetch("/api/canlii/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "case",
+          query: c.caseName,
+          apiKey,
+        }),
+      });
+      const json = (await res.json()) as
+        | { ok: true; hits: { title: string; citation: string; url: string }[] }
+        | { ok: false; errorKind?: string; message?: string; error?: string };
+
+      if (!json.ok) {
+        setCaseCanliiState((s) => ({
+          ...s,
+          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed." },
+        }));
+        return;
+      }
+      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits } }));
+    } catch (err) {
+      setCaseCanliiState((s) => ({
+        ...s,
+        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err) },
+      }));
+    }
+  }
 
   async function handleCanLIISearch(idx: number, c: ExtractedCitation) {
     const apiKey =
@@ -148,10 +216,12 @@ export default function CitationTestPage() {
   }
 
   function handleExtract() {
-    const result = extractCitations(text);
-    setCitations(result);
+    setCitations(extractCitations(text));
+    setCaseCitations(extractCaseCitations(text));
     setLookups({});
     setVerifies({});
+    setCanliiState({});
+    setCaseCanliiState({});
   }
 
   async function handleLookup(idx: number, c: ExtractedCitation) {
@@ -481,6 +551,86 @@ export default function CitationTestPage() {
                 {verify.status === "error" && (
                   <div className="mx-4 mb-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
                     AI error: {verify.error}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {/* Case-law citations */}
+      {caseCitations.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+            {caseCitations.length} case citation{caseCitations.length === 1 ? "" : "s"} found
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Use CanLII to confirm each case is real and that the citation matches the name.
+          </p>
+          {caseCitations.map((c, idx) => {
+            const state = caseCanliiState[idx];
+            return (
+              <div key={idx} className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 p-4">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{c.caseName}</div>
+                    <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      {c.citation ? (
+                        <span className="font-mono">{c.citation}</span>
+                      ) : (
+                        <span className="italic">no citation detected</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCaseCanLIISearch(idx, c)}
+                    disabled={state?.status === "loading"}
+                    className="rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
+                  >
+                    {state?.status === "loading" ? "Searching CanLII…" : "Search CanLII"}
+                  </button>
+                </div>
+
+                <div className="border-t border-slate-100 px-4 py-2 dark:border-slate-800">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Claude&apos;s claim</span>
+                  <p className="mt-0.5 text-xs italic text-slate-600 dark:text-slate-400">{c.context}</p>
+                </div>
+
+                {state && (
+                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">CanLII results</span>
+                    {state.status === "loading" && (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Searching CanLII…</p>
+                    )}
+                    {state.status === "error" && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">⚠ {state.message}</p>
+                    )}
+                    {state.status === "ok" && (
+                      state.hits.length === 0 ? (
+                        <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
+                          No matching case found on CanLII — possibly a hallucinated citation.
+                        </p>
+                      ) : (
+                        <ul className="mt-1.5 space-y-1">
+                          {state.hits.slice(0, 5).map((h, i) => (
+                            <li key={i} className="text-[11px]">
+                              <a
+                                href={h.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                {h.title}
+                              </a>
+                              {h.citation && (
+                                <span className="ml-1 text-slate-500 dark:text-slate-400">· {h.citation}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    )}
                   </div>
                 )}
               </div>
