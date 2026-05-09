@@ -962,77 +962,109 @@ export default function HomePage() {
           if (!model || !r) return null;
           const parsed = r.status === "ok" ? parseVerdict(r.text) : null;
           const style = parsed ? VERDICT_STYLES[parsed.verdict] : VERDICT_STYLES.none;
-          return (
-            <div
-              key={id}
-              id={cardAnchorId(id)}
-              className={`rounded-xl border border-slate-200 p-3 shadow-sm dark:border-slate-800 sm:p-4 ${
-                r.status === "ok" ? style.card : "bg-white dark:bg-slate-900"
-              }`}
-            >
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="min-w-0">
+          // Loading cards are NOT collapsed — user wants to see progress
+          if (r.status === "loading") {
+            return (
+              <div
+                key={id}
+                id={cardAnchorId(id)}
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4"
+              >
+                <div className="mb-2 flex items-center gap-3">
                   <h3 className="font-semibold text-slate-900 dark:text-slate-100">{model.label}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Role: {ROLE_LABELS[getRole(id)]}</p>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">working…</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {parsed && parsed.verdict !== "none" && (
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs font-medium ${style.chip}`}
-                    >
-                      {style.emoji} {style.chipText}
-                    </span>
-                  )}
-                  {r.status === "ok" && (
-                    <button
-                      onClick={() => navigator.clipboard.writeText(r.text)}
-                      className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      Copy
-                    </button>
-                  )}
-                </div>
-              </div>
-              {r.status === "loading" && (
                 <div className="space-y-2">
                   <div className="h-3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                   <div className="h-3 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                   <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
                 </div>
-              )}
-              {r.status === "ok" && parsed && (
-                <div className="prose prose-sm max-w-none overflow-x-auto break-words dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
+              </div>
+            );
+          }
+          return (
+            <details
+              key={id}
+              id={cardAnchorId(id)}
+              className={`group rounded-xl border border-slate-200 shadow-sm dark:border-slate-800 ${
+                r.status === "ok" ? style.card : "bg-white dark:bg-slate-900"
+              }`}
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3 sm:p-4 [&::-webkit-details-marker]:hidden">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 text-slate-400 group-open:rotate-90 transition-transform">▸</span>
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold text-slate-900 dark:text-slate-100">{model.label}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Role: {ROLE_LABELS[getRole(id)]}</p>
+                  </div>
                 </div>
-              )}
-              {r.status === "ok" && parsed && (parsed.verdict === "yellow" || parsed.verdict === "red") && (
-                <AdjudicationPanel
-                  challengerId={id}
-                  pickerOpenFor={pickerOpenFor}
-                  setPickerOpenFor={setPickerOpenFor}
-                  selected={selected}
-                  allModels={allModels}
-                  apiKeys={apiKeys}
-                  adjudications={adjudications}
-                  runAdjudication={runAdjudication}
-                />
-              )}
-              {r.status === "deeplink" && (
-                <div className="text-sm">
-                  <p className="mb-2 text-slate-700 dark:text-slate-300">
-                    Prompt copied to clipboard. Open the site and paste:
-                  </p>
-                  <a
-                    href={r.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
+                <div className="flex shrink-0 items-center gap-2">
+                  {parsed && parsed.verdict !== "none" && (
+                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${style.chip}`}>
+                      {style.emoji} {style.chipText}
+                    </span>
+                  )}
+                </div>
+              </summary>
+
+              <div className="border-t border-slate-200/60 px-3 pb-3 pt-3 dark:border-slate-700/60 sm:px-4 sm:pb-4">
+                <div className="mb-2 flex items-center justify-end gap-2">
+                  {r.status === "ok" && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigator.clipboard.writeText(r.text);
+                      }}
+                      className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Copy
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const el = e.currentTarget.closest("details");
+                      if (el) el.open = false;
+                    }}
+                    className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
-                    Open {model.label}
-                  </a>
+                    Close
+                  </button>
                 </div>
-              )}
-            </div>
+                {r.status === "ok" && parsed && (
+                  <div className="prose prose-sm max-w-none overflow-x-auto break-words dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-pre:overflow-x-auto prose-table:block prose-table:overflow-x-auto">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
+                  </div>
+                )}
+                {r.status === "ok" && parsed && (parsed.verdict === "yellow" || parsed.verdict === "red") && (
+                  <AdjudicationPanel
+                    challengerId={id}
+                    pickerOpenFor={pickerOpenFor}
+                    setPickerOpenFor={setPickerOpenFor}
+                    selected={selected}
+                    allModels={allModels}
+                    apiKeys={apiKeys}
+                    adjudications={adjudications}
+                    runAdjudication={runAdjudication}
+                  />
+                )}
+                {r.status === "deeplink" && (
+                  <div className="text-sm">
+                    <p className="mb-2 text-slate-700 dark:text-slate-300">
+                      Prompt copied to clipboard. Open the site and paste:
+                    </p>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
+                    >
+                      Open {model.label}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </details>
           );
         };
 
@@ -1081,24 +1113,52 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* ── Original model responses ─────────────────────────────── */}
+            {/* ── 1. Verdict summary ───────────────────────────────────── */}
             <VerdictScoreboard entries={scoreboardEntries} />
+
+            {/* ── 2. AI-synthesised consolidation (top, near summary) ──── */}
+            {consolidationCritiques.length >= 1 && (
+              <ConsolidatePanel
+                critiques={consolidationCritiques}
+                claudeAnswer={claudeAnswer}
+                documentText={documentText}
+                userQuestion={userQuestion}
+                availableModels={allModels}
+                apiKeys={apiKeys}
+              />
+            )}
+
+            {/* ── 3. Concerns at a glance (per-model collapsible) ──────── */}
+            {consolidationCritiques.length >= 1 && (
+              <AmberSummaryPanel critiques={consolidationCritiques} />
+            )}
+
+            {/* ── 4. Individual model responses (all collapsed) ────────── */}
+            {(loadingIds.length > 0 || nonGreenDoneIds.length > 0 || greenDoneIds.length > 0) && (
+              <div className="flex items-center gap-3 pt-2">
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Original model responses · click any card to expand
+                </span>
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              </div>
+            )}
             {loadingIds.map(renderCard)}
             {nonGreenDoneIds.map(renderCard)}
             {greenDoneIds.length > 0 && (
-              <details className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                <summary className="cursor-pointer text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              <details className="rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <summary className="cursor-pointer p-3 text-sm font-medium text-emerald-800 dark:text-emerald-300">
                   ✓ {greenDoneIds.length} confirmed correct — click to expand
                 </summary>
-                <div className="mt-3 space-y-3">{greenDoneIds.map(renderCard)}</div>
+                <div className="space-y-3 border-t border-emerald-200/60 p-3 dark:border-emerald-900/40">{greenDoneIds.map(renderCard)}</div>
               </details>
             )}
             {errorIds.length > 0 && (
-              <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-300">
+              <details className="rounded-xl border border-slate-200 bg-slate-50 text-sm dark:border-slate-800 dark:bg-slate-900">
+                <summary className="cursor-pointer p-3 font-medium text-slate-700 dark:text-slate-300">
                   {errorIds.length} model{errorIds.length === 1 ? "" : "s"} failed — click to expand
                 </summary>
-                <div className="mt-3 space-y-3">
+                <div className="space-y-3 border-t border-slate-200 p-3 dark:border-slate-800">
                   {errorIds.map((id) => {
                     const model = allModels.find((m) => m.id === id);
                     const r = results[id];
@@ -1117,28 +1177,6 @@ export default function HomePage() {
                   })}
                 </div>
               </details>
-            )}
-
-            {/* ── Concern overview + AI synthesis (only when concerns exist) ── */}
-            {consolidationCritiques.length >= 1 && (
-              <>
-                <div className="flex items-center gap-3 pt-2">
-                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    Concern analysis
-                  </span>
-                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                </div>
-                <AmberSummaryPanel critiques={consolidationCritiques} />
-                <ConsolidatePanel
-                  critiques={consolidationCritiques}
-                  claudeAnswer={claudeAnswer}
-                  documentText={documentText}
-                  userQuestion={userQuestion}
-                  availableModels={allModels}
-                  apiKeys={apiKeys}
-                />
-              </>
             )}
           </section>
         );

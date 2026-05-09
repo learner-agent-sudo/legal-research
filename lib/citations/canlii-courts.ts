@@ -1,47 +1,76 @@
+/**
+ * Court abbreviation → CanLII API database ID.
+ *
+ * Important: the API uses BILINGUAL prefixes for federal/Quebec/SCC databases
+ * (e.g. SCC → "csc-scc"), but English-only abbreviations for provincial ones.
+ * Web URLs (canlii.org/en/ca/scc/...) use a different shorter form than the
+ * API path, so don't assume they match.
+ */
 export const COURT_TO_DB: Record<string, string> = {
-  // Supreme Court of Canada
-  "SCC": "scc",
-  // Federal
-  "FCA": "fca",
-  "FC": "fc",
-  "FCJ": "fc",
-  "FCT": "fc",
+  // Supreme Court of Canada — bilingual code
+  "SCC": "csc-scc",
+  "CSC": "csc-scc",
+  // Federal courts — bilingual codes
+  "FCA": "caf-fca",   // Cour d'appel fédérale / Federal Court of Appeal
+  "CAF": "caf-fca",
+  "FC":  "cf-fc",     // Cour fédérale / Federal Court
+  "CF":  "cf-fc",
+  "FCJ": "cf-fc",
+  "FCT": "cf-fc",
+  "TCC": "tcc",       // Tax Court of Canada
   // Ontario
-  "ONCA": "onca",
-  "ONSC": "onsc",
-  "ONCJ": "oncj",
-  "ONDC": "ondc",
-  "ONSDIV": "onsc",
+  "ONCA":  "onca",
+  "ONSC":  "onsc",
+  "ONCJ":  "oncj",
+  "ONSCDC": "onscdc", // Divisional Court
+  "ONSCJ":  "onsc",
+  "ONDC":  "onsc",
+  "ONSDIV":"onscdc",
+  "HCJ":   "onsc",
   // BC
   "BCCA": "bcca",
   "BCSC": "bcsc",
+  "BCPC": "bcpc",
   // Alberta
   "ABCA": "abca",
   "ABQB": "abqb",
-  "ABKB": "abqb",
-  // Quebec
+  "ABKB": "abkb",
+  "ABPC": "abpc",
+  // Quebec — bilingual
   "QCCA": "qcca",
   "QCCS": "qccs",
-  // Others
+  "QCCQ": "qccq",
+  // Nova Scotia
   "NSCA": "nsca",
   "NSSC": "nssc",
+  "NSPC": "nspc",
+  // Manitoba
   "MBCA": "mbca",
   "MBQB": "mbqb",
+  "MBKB": "mbkb",
+  // Saskatchewan
   "SKCA": "skca",
   "SKQB": "skqb",
+  "SKKB": "skkb",
+  // New Brunswick
   "NBCA": "nbca",
   "NBQB": "nbqb",
-  "PECA": "peca",
+  "NBKB": "nbkb",
+  // PEI
+  "PECA":  "peca",
   "PEICA": "peca",
+  "PESCAD":"pesctd",
+  // Newfoundland & Labrador
   "NLCA": "nlca",
   "NLSC": "nlsc",
-  "YKCA": "ykca",
-  "YKSC": "yksc",
+  "NLPC": "nlpc",
+  // Territories
+  "YKCA":  "ykca",
+  "YKSC":  "yksc",
   "NWTCA": "nwtca",
   "NWTSC": "nwtsc",
-  "NUCJ": "nucj",
-  "HCJ": "onsc", // Ontario High Court of Justice (older)
-  "CA": "onca",  // ambiguous but Ontario CA is most common
+  "NUCJ":  "nucj",
+  "NUCA":  "nuca",
 };
 
 /**

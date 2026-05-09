@@ -374,20 +374,38 @@ function ExpandedSession({
             (a) => a.challengerId === r.modelId
           );
           return (
-            <div key={i} id={cardAnchorId(r.modelId)} className={`rounded-lg border p-3 ${cardStyle}`}>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{r.modelLabel}</span>
-                {r.status === "ok" && verdict !== "none" && (
-                  <span className={`rounded px-2 py-0.5 text-xs font-medium ${style.chip}`}>
-                    {style.emoji} {verdict}
-                  </span>
-                )}
-                {r.status === "deeplink" && (
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    Manual paste
-                  </span>
-                )}
-              </div>
+            <details key={i} id={cardAnchorId(r.modelId)} className={`group rounded-lg border ${cardStyle}`}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3 [&::-webkit-details-marker]:hidden">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 text-slate-400 transition-transform group-open:rotate-90">▸</span>
+                  <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{r.modelLabel}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {r.status === "ok" && verdict !== "none" && (
+                    <span className={`rounded px-2 py-0.5 text-xs font-medium ${style.chip}`}>
+                      {style.emoji} {verdict}
+                    </span>
+                  )}
+                  {r.status === "deeplink" && (
+                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      Manual paste
+                    </span>
+                  )}
+                </div>
+              </summary>
+              <div className="border-t border-slate-200/60 p-3 dark:border-slate-700/60">
+                <div className="mb-2 flex justify-end">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const el = e.currentTarget.closest("details");
+                      if (el) el.open = false;
+                    }}
+                    className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Close
+                  </button>
+                </div>
               {r.status === "ok" && r.text && (
                 <div className="prose prose-sm max-w-none overflow-x-auto break-words dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -435,7 +453,8 @@ function ExpandedSession({
                   })}
                 </div>
               )}
-            </div>
+              </div>
+            </details>
           );
         };
 
@@ -459,36 +478,38 @@ function ExpandedSession({
         return (
           <div className="space-y-3">
             <VerdictScoreboard entries={scoreboardEntries} />
+            {consolidationCritiques.length >= 1 && (
+              <ConsolidatePanel
+                critiques={consolidationCritiques}
+                claudeAnswer={session.claudeAnswer}
+                documentText={session.documentText}
+                userQuestion={session.userQuestion}
+                availableModels={allModels}
+                apiKeys={apiKeys}
+              />
+            )}
+            {consolidationCritiques.length >= 1 && (
+              <AmberSummaryPanel critiques={consolidationCritiques} />
+            )}
+            {(nonGreenResults.length > 0 || greenResults.length > 0) && (
+              <div className="flex items-center gap-3 pt-2">
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Original responses · click any card to expand
+                </span>
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              </div>
+            )}
             {nonGreenResults.map((r, i) => renderResult(r, i))}
             {greenResults.length > 0 && (
-              <details className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                <summary className="cursor-pointer text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              <details className="rounded-lg border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <summary className="cursor-pointer p-3 text-sm font-medium text-emerald-800 dark:text-emerald-300">
                   ✓ {greenResults.length} confirmed correct — click to expand
                 </summary>
-                <div className="mt-3 space-y-3">
+                <div className="space-y-3 border-t border-emerald-200/60 p-3 dark:border-emerald-900/40">
                   {greenResults.map((r, i) => renderResult(r, nonGreenResults.length + i))}
                 </div>
               </details>
-            )}
-            {consolidationCritiques.length >= 1 && (
-              <>
-                <div className="flex items-center gap-3 pt-1">
-                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    Concern analysis
-                  </span>
-                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                </div>
-                <AmberSummaryPanel critiques={consolidationCritiques} />
-                <ConsolidatePanel
-                  critiques={consolidationCritiques}
-                  claudeAnswer={session.claudeAnswer}
-                  documentText={session.documentText}
-                  userQuestion={session.userQuestion}
-                  availableModels={allModels}
-                  apiKeys={apiKeys}
-                />
-              </>
             )}
           </div>
         );
