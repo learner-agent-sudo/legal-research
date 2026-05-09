@@ -36,7 +36,6 @@ import type { SessionAdjudication } from "@/lib/auth/kv-store";
 import { useToast } from "@/components/Toast";
 import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
 import { ConsolidatePanel } from "@/components/ConsolidatePanel";
-import { AmberSummaryPanel } from "@/components/AmberSummaryPanel";
 import type { ConsolidationCritique } from "@/lib/prompts";
 
 const ROLE_OPTIONS: VerificationRole[] = [
@@ -1128,12 +1127,7 @@ export default function HomePage() {
               />
             )}
 
-            {/* ── 3. Concerns at a glance (per-model collapsible) ──────── */}
-            {consolidationCritiques.length >= 1 && (
-              <AmberSummaryPanel critiques={consolidationCritiques} />
-            )}
-
-            {/* ── 4. Individual model responses (all collapsed) ────────── */}
+            {/* ── 3. Individual model responses (all collapsed) ────────── */}
             {(loadingIds.length > 0 || nonGreenDoneIds.length > 0 || greenDoneIds.length > 0) && (
               <div className="flex items-center gap-3 pt-2">
                 <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />

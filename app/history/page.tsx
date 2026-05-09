@@ -25,7 +25,6 @@ import {
 import { BUILTIN_PRESETS, type ModelPreset } from "@/lib/presets";
 import { useToast } from "@/components/Toast";
 import { VerdictScoreboard, cardAnchorId, extractExcerpt, type ScoreboardEntry } from "@/components/VerdictScoreboard";
-import { AmberSummaryPanel } from "@/components/AmberSummaryPanel";
 import { ConsolidatePanel } from "@/components/ConsolidatePanel";
 import type { ConsolidationCritique } from "@/lib/prompts";
 
@@ -487,9 +486,6 @@ function ExpandedSession({
                 availableModels={allModels}
                 apiKeys={apiKeys}
               />
-            )}
-            {consolidationCritiques.length >= 1 && (
-              <AmberSummaryPanel critiques={consolidationCritiques} />
             )}
             {(nonGreenResults.length > 0 || greenResults.length > 0) && (
               <div className="flex items-center gap-3 pt-2">
