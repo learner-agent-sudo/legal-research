@@ -277,11 +277,13 @@ describe("buildConsolidationPrompt", () => {
     expect(p).toContain("misses the exception");
   });
 
-  it("includes the answer, document, and question", () => {
+  it("includes the answer and question (document is intentionally excluded)", () => {
     const p = buildConsolidationPrompt(ARGS);
     expect(p).toContain("Section 14 of the ESA requires X.");
-    expect(p).toContain("Section 13 talks about Y.");
     expect(p).toContain("Does the ESA require X?");
+    // Document text is NOT included to keep token count manageable —
+    // critiques already quote the relevant parts.
+    expect(p).not.toContain("Section 13 talks about Y.");
   });
 
   it("uses fallback when userQuestion is omitted", () => {
@@ -305,12 +307,11 @@ describe("buildConsolidationPrompt", () => {
     expect(p.toLowerCase()).toContain("by theme");
   });
 
-  it("truncates very long documentText", () => {
+  it("does not include the document even when very long", () => {
     const p = buildConsolidationPrompt({
       ...ARGS,
       documentText: "x".repeat(80000),
     });
-    expect(p).toContain("x".repeat(60000));
-    expect(p).not.toContain("x".repeat(60001));
+    expect(p).not.toContain("xxxxx");
   });
 });

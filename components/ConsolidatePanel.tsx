@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -8,6 +8,26 @@ import {
   type ConsolidationCritique,
 } from "@/lib/prompts";
 import type { ModelPreset } from "@/lib/presets";
+
+/**
+ * Effective-throughput estimate per model. Higher = safer for big prompts.
+ * Groq's free tier has a ~12K tokens-per-minute cap regardless of nominal
+ * context length, so we penalise it heavily.
+ */
+function estimatedThroughput(m: ModelPreset): number {
+  if (m.contextLength && m.contextLength > 0) {
+    return m.provider === "groq" ? Math.min(m.contextLength, 8_000) : m.contextLength;
+  }
+  if (m.kind === "gemini") return 1_000_000;
+  if (m.provider === "mistral") return 32_000;
+  if (m.provider === "openrouter") return 32_000;
+  if (m.provider === "groq") return 8_000;
+  return 4_000;
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
 
 type Verdict = "critical" | "moderate" | "minor" | "none";
 
@@ -57,18 +77,45 @@ export type ConsolidatePanelProps = {
 export function ConsolidatePanel(props: ConsolidatePanelProps) {
   const { critiques, claudeAnswer, documentText, userQuestion, availableModels, apiKeys } = props;
 
+  // Sort eligible models by estimated throughput (largest first) so the
+  // default pick is the one most likely to handle big prompts.
+  const eligibleModels = useMemo(
+    () =>
+      availableModels
+        .filter(
+          (m) =>
+            (m.kind === "openai-compat" || m.kind === "gemini") &&
+            Boolean(apiKeys[m.provider]?.trim())
+        )
+        .sort((a, b) => estimatedThroughput(b) - estimatedThroughput(a)),
+    [availableModels, apiKeys]
+  );
+
   const [selectedModelId, setSelectedModelId] = useState<string>(
-    availableModels[0]?.id ?? ""
+    eligibleModels[0]?.id ?? ""
   );
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (critiques.length === 0) return null;
+  // Estimate prompt size so the user sees ahead of time if they're flirting
+  // with the selected model's per-minute cap.
+  const estimatedPromptTokens = useMemo(() => {
+    if (critiques.length === 0) return 0;
+    const prompt = buildConsolidationPrompt({
+      claudeAnswer,
+      documentText,
+      userQuestion,
+      critiques,
+    });
+    return estimateTokens(prompt);
+  }, [claudeAnswer, documentText, userQuestion, critiques]);
 
-  const eligibleModels = availableModels.filter(
-    (m) => (m.kind === "openai-compat" || m.kind === "gemini") && Boolean(apiKeys[m.provider]?.trim())
-  );
+  const selectedModel = eligibleModels.find((m) => m.id === selectedModelId);
+  const selectedCap = selectedModel ? estimatedThroughput(selectedModel) : 0;
+  const tooBig = selectedCap > 0 && estimatedPromptTokens > selectedCap;
+
+  if (critiques.length === 0) return null;
 
   async function runConsolidation() {
     const model = eligibleModels.find((m) => m.id === selectedModelId);
@@ -159,6 +206,18 @@ export function ConsolidatePanel(props: ConsolidatePanelProps) {
           {running ? "Synthesising…" : "Consolidate"}
         </button>
       </div>
+
+      {eligibleModels.length > 0 && (
+        <p className={`mt-2 text-[11px] ${tooBig ? "text-rose-700 dark:text-rose-400" : "text-slate-500 dark:text-slate-400"}`}>
+          ~{estimatedPromptTokens.toLocaleString()} tokens to send
+          {selectedCap > 0 && (
+            <> · this model&apos;s effective limit ≈{selectedCap.toLocaleString()}</>
+          )}
+          {tooBig && (
+            <> — pick a higher-context model{eligibleModels[0]?.kind === "gemini" ? " (Gemini handles ~1M tokens)" : ""}</>
+          )}
+        </p>
+      )}
 
       {error && (
         <p className="mt-3 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">

@@ -226,8 +226,6 @@ export type BuildConsolidationArgs = BuildPromptArgs & {
 export function buildConsolidationPrompt(args: BuildConsolidationArgs): string {
   const userQuestion = args.userQuestion?.trim() || "[no question provided]";
   const claudeAnswer = args.claudeAnswer.trim();
-  const documentText =
-    args.documentText?.trim().slice(0, MAX_DOC_CHARS) || "[no document attached]";
 
   const critiquesBlock = args.critiques
     .map(
@@ -240,6 +238,8 @@ export function buildConsolidationPrompt(args: BuildConsolidationArgs): string {
   return `You are consolidating multiple AI critiques of the same legal answer into a single, structured report.
 
 Several AI models reviewed the answer below and flagged concerns (verdicts [RED] = major issues, [YELLOW] = some concerns). Your job is to merge their concerns by theme — NOT model-by-model — so the user sees the unique issues that were raised, who raised them, and how serious each one is.
+
+Each critique is self-contained: it already quotes the parts of the answer it is concerned about. You do NOT need to re-verify the answer against any reference document — only synthesise what the critiques say.
 
 Format requirement: your VERY FIRST line must be exactly one of these tags, on its own line:
 [CRITICAL] — at least one severe issue is corroborated by multiple models
@@ -255,11 +255,6 @@ ${userQuestion}
 Answer being reviewed:
 """
 ${claudeAnswer}
-"""
-
-Reference document:
-"""
-${documentText}
 """
 
 Individual critiques (${args.critiques.length} models):
