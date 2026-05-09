@@ -7,7 +7,7 @@ import {
   type ExtractedCitation,
   type ExtractedCaseCitation,
 } from "@/lib/citations/extract";
-import { courtAbbrevToDb } from "@/lib/citations/canlii-courts";
+import { courtAbbrevToDb, citationToCanLIIDocUrl } from "@/lib/citations/canlii-courts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -26,11 +26,12 @@ type VerifyState =
 
 type CanLIIHit = { title: string; citation: string; url: string };
 
+type FallbackKind = "doc" | "search";
 type CanLIIState =
   | { status: "loading" }
-  | { status: "ok"; hits: CanLIIHit[]; fallbackUrl?: string }
-  | { status: "error"; message: string; fallbackUrl?: string }
-  | { status: "no-court"; message: string; fallbackUrl: string };
+  | { status: "ok"; hits: CanLIIHit[]; fallbackUrl?: string; fallbackKind?: FallbackKind }
+  | { status: "error"; message: string; fallbackUrl?: string; fallbackKind?: FallbackKind }
+  | { status: "no-court"; message: string; fallbackUrl: string; fallbackKind: FallbackKind };
 
 type ModelPreset = {
   label: string;
@@ -130,8 +131,13 @@ export default function CitationTestPage() {
       return;
     }
 
-    // Build fallback URL for canlii.org full-text search
-    const fallbackUrl = `https://www.canlii.org/en/#search/text=${encodeURIComponent(c.caseName)}&type=decision`;
+    // Prefer a deterministic doc URL when the citation parses cleanly;
+    // fall back to a canlii.org search URL otherwise. The doc URL is
+    // robust against API outages or expired keys.
+    const docUrl = c.citation ? citationToCanLIIDocUrl(c.citation) : null;
+    const searchUrl = `https://www.canlii.org/en/#search/text=${encodeURIComponent(c.caseName)}&type=decision`;
+    const fallbackUrl = docUrl ?? searchUrl;
+    const fallbackKind: FallbackKind = docUrl ? "doc" : "search";
 
     // Try to resolve the court from the citation
     const databaseId = c.citation ? courtAbbrevToDb(c.citation) : null;
@@ -144,6 +150,7 @@ export default function CitationTestPage() {
           status: "no-court",
           message: "This court is not on CanLII (non-Canadian)",
           fallbackUrl,
+          fallbackKind,
         },
       }));
       return;
@@ -183,15 +190,15 @@ export default function CitationTestPage() {
       if (!json.ok) {
         setCaseCanliiState((s) => ({
           ...s,
-          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed.", fallbackUrl },
+          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed.", fallbackUrl, fallbackKind },
         }));
         return;
       }
-      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits, fallbackUrl } }));
+      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits, fallbackUrl, fallbackKind } }));
     } catch (err) {
       setCaseCanliiState((s) => ({
         ...s,
-        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err), fallbackUrl },
+        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err), fallbackUrl, fallbackKind },
       }));
     }
   }
@@ -648,7 +655,7 @@ export default function CitationTestPage() {
                           rel="noreferrer"
                           className="font-medium underline hover:text-amber-900 dark:hover:text-amber-300"
                         >
-                          Open on CanLII ↗
+                          {state.fallbackKind === "doc" ? "Read this case on CanLII ↗" : "Search CanLII ↗"}
                         </a>
                       </p>
                     )}
@@ -662,7 +669,7 @@ export default function CitationTestPage() {
                             rel="noreferrer"
                             className="mt-0.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                           >
-                            Open on CanLII ↗
+                            {state.fallbackKind === "doc" ? "Read this case on CanLII ↗" : "Search CanLII ↗"}
                           </a>
                         )}
                       </div>
@@ -699,7 +706,7 @@ export default function CitationTestPage() {
                             rel="noreferrer"
                             className="mt-1.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                           >
-                            Open on CanLII ↗
+                            {state.fallbackKind === "doc" ? "Read this case on CanLII ↗" : "Search CanLII ↗"}
                           </a>
                         )}
                       </div>
