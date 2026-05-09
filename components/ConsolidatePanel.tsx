@@ -96,6 +96,7 @@ export function ConsolidatePanel(props: ConsolidatePanelProps) {
   );
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [resultModelLabel, setResultModelLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Estimate prompt size so the user sees ahead of time if they're flirting
@@ -132,6 +133,7 @@ export function ConsolidatePanel(props: ConsolidatePanelProps) {
     setRunning(true);
     setError(null);
     setResult(null);
+    setResultModelLabel(null);
 
     try {
       const prompt = buildConsolidationPrompt({
@@ -154,6 +156,7 @@ export function ConsolidatePanel(props: ConsolidatePanelProps) {
       const json = (await res.json()) as { text?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
       setResult(json.text ?? "");
+      setResultModelLabel(model.label);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -165,19 +168,18 @@ export function ConsolidatePanel(props: ConsolidatePanelProps) {
   const style = parsed ? VERDICT_STYLES[parsed.verdict] : null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-          Consolidate concerns
-        </h3>
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          ({critiques.length} model{critiques.length === 1 ? "" : "s"} flagged red/yellow)
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-3 shadow-sm dark:border-indigo-800/50 dark:bg-indigo-950/20 sm:p-4">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span className="rounded bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300">
+          ✦ AI synthesis
         </span>
+        <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+          Synthesise concerns with AI
+        </h3>
       </div>
-
-      <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-        Send all RED and YELLOW critiques to one model and get back a single report grouped by
-        theme — useful when several models disagree.
+      <p className="mb-3 text-xs text-indigo-700/70 dark:text-indigo-400/80">
+        Ask a model to merge the {critiques.length} flagged concern{critiques.length === 1 ? "" : "s"} into one themed report.
+        This is a <strong>new AI-generated output</strong> — not one of the original model responses above.
       </p>
 
       {/* Model picker + button — stacks on mobile */}
@@ -226,16 +228,29 @@ export function ConsolidatePanel(props: ConsolidatePanelProps) {
       )}
 
       {parsed && style && (
-        <div className={`mt-3 rounded-lg border p-3 ${style.card}`}>
-          {parsed.verdict !== "none" && (
-            <div className="mb-2 flex items-center gap-2">
+        <div className="mt-3 rounded-lg border border-indigo-200 bg-white dark:border-indigo-800/40 dark:bg-slate-900">
+          {/* Attribution bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 px-3 py-2 dark:border-indigo-900/40">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300">
+                ✦ AI generated
+              </span>
+              {resultModelLabel && (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  by {resultModelLabel}
+                </span>
+              )}
+            </div>
+            {parsed.verdict !== "none" && (
               <span className={`rounded px-2 py-0.5 text-xs font-semibold ${style.chip}`}>
                 {style.label}
               </span>
+            )}
+          </div>
+          <div className="p-3">
+            <div className="prose prose-sm max-w-none overflow-x-auto break-words dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
             </div>
-          )}
-          <div className="prose prose-sm max-w-none overflow-x-auto break-words dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.body}</ReactMarkdown>
           </div>
         </div>
       )}

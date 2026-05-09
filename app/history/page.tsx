@@ -459,17 +459,6 @@ function ExpandedSession({
         return (
           <div className="space-y-3">
             <VerdictScoreboard entries={scoreboardEntries} />
-            <AmberSummaryPanel critiques={consolidationCritiques} />
-            {consolidationCritiques.length >= 1 && (
-              <ConsolidatePanel
-                critiques={consolidationCritiques}
-                claudeAnswer={session.claudeAnswer}
-                documentText={session.documentText}
-                userQuestion={session.userQuestion}
-                availableModels={allModels}
-                apiKeys={apiKeys}
-              />
-            )}
             {nonGreenResults.map((r, i) => renderResult(r, i))}
             {greenResults.length > 0 && (
               <details className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
@@ -480,6 +469,26 @@ function ExpandedSession({
                   {greenResults.map((r, i) => renderResult(r, nonGreenResults.length + i))}
                 </div>
               </details>
+            )}
+            {consolidationCritiques.length >= 1 && (
+              <>
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Concern analysis
+                  </span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                </div>
+                <AmberSummaryPanel critiques={consolidationCritiques} />
+                <ConsolidatePanel
+                  critiques={consolidationCritiques}
+                  claudeAnswer={session.claudeAnswer}
+                  documentText={session.documentText}
+                  userQuestion={session.userQuestion}
+                  availableModels={allModels}
+                  apiKeys={apiKeys}
+                />
+              </>
             )}
           </div>
         );

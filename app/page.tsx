@@ -1080,18 +1080,9 @@ export default function HomePage() {
                 {okCount} answered · {errorIds.length} failed · {orderedIds.length} total
               </p>
             </div>
+
+            {/* ── Original model responses ─────────────────────────────── */}
             <VerdictScoreboard entries={scoreboardEntries} />
-            <AmberSummaryPanel critiques={consolidationCritiques} />
-            {consolidationCritiques.length >= 1 && (
-              <ConsolidatePanel
-                critiques={consolidationCritiques}
-                claudeAnswer={claudeAnswer}
-                documentText={documentText}
-                userQuestion={userQuestion}
-                availableModels={allModels}
-                apiKeys={apiKeys}
-              />
-            )}
             {loadingIds.map(renderCard)}
             {nonGreenDoneIds.map(renderCard)}
             {greenDoneIds.length > 0 && (
@@ -1126,6 +1117,28 @@ export default function HomePage() {
                   })}
                 </div>
               </details>
+            )}
+
+            {/* ── Concern overview + AI synthesis (only when concerns exist) ── */}
+            {consolidationCritiques.length >= 1 && (
+              <>
+                <div className="flex items-center gap-3 pt-2">
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Concern analysis
+                  </span>
+                  <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                </div>
+                <AmberSummaryPanel critiques={consolidationCritiques} />
+                <ConsolidatePanel
+                  critiques={consolidationCritiques}
+                  claudeAnswer={claudeAnswer}
+                  documentText={documentText}
+                  userQuestion={userQuestion}
+                  availableModels={allModels}
+                  apiKeys={apiKeys}
+                />
+              </>
             )}
           </section>
         );

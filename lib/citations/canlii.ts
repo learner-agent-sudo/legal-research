@@ -228,3 +228,18 @@ export async function searchCanLIICases(
   const path = `/caseBrowse/en/?text=${q}${jq}`;
   return canliiFetch(path, apiKey, parseCaseHits);
 }
+
+/**
+ * Search CanLII for cases in a specific database (court).
+ * partyName: one distinctive party word, e.g. "Keays".
+ * databaseId: CanLII database id, e.g. "scc", "onca".
+ */
+export async function searchCanLIICasesByDb(
+  partyName: string,
+  databaseId: string,
+  apiKey: string
+): Promise<CanLIIResult<CanLIICaseHit>> {
+  const q = encodeURIComponent(partyName.trim());
+  const path = `/caseBrowse/en/${encodeURIComponent(databaseId)}/?text=${q}`;
+  return canliiFetch(path, apiKey, parseCaseHits);
+}

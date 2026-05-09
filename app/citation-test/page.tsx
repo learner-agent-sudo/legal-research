@@ -7,6 +7,7 @@ import {
   type ExtractedCitation,
   type ExtractedCaseCitation,
 } from "@/lib/citations/extract";
+import { courtAbbrevToDb } from "@/lib/citations/canlii-courts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,8 +28,9 @@ type CanLIIHit = { title: string; citation: string; url: string };
 
 type CanLIIState =
   | { status: "loading" }
-  | { status: "ok"; hits: CanLIIHit[] }
-  | { status: "error"; message: string };
+  | { status: "ok"; hits: CanLIIHit[]; fallbackUrl?: string }
+  | { status: "error"; message: string; fallbackUrl?: string }
+  | { status: "no-court"; message: string; fallbackUrl: string };
 
 type ModelPreset = {
   label: string;
@@ -128,10 +130,29 @@ export default function CitationTestPage() {
       return;
     }
 
+    // Build fallback URL for canlii.org full-text search
+    const fallbackUrl = `https://www.canlii.org/en/#search/text=${encodeURIComponent(c.caseName)}&type=decision`;
+
+    // Try to resolve the court from the citation
+    const databaseId = c.citation ? courtAbbrevToDb(c.citation) : null;
+
+    if (!databaseId) {
+      // No recognisable Canadian court — skip the API call and show a link instead
+      setCaseCanliiState((s) => ({
+        ...s,
+        [idx]: {
+          status: "no-court",
+          message: "This court is not on CanLII (non-Canadian)",
+          fallbackUrl,
+        },
+      }));
+      return;
+    }
+
     setCaseCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
 
-    // Build a cleaner search query: extract one distinctive word from each party
-    // e.g. "Honda Canada Inc. v. Keays" → "Honda Keays"
+    // Build a cleaner search query: use the most distinctive word from the second party
+    // e.g. "Honda Canada Inc. v. Keays" → "Keays"
     const parts = c.caseName.split(/\sv\.?\s/i);
     const pickWord = (side: string) => {
       const words = side.trim().split(/\s+/);
@@ -140,7 +161,9 @@ export default function CitationTestPage() {
       );
       return meaningful[0] ?? words[0];
     };
-    const queryTerms = parts.map(pickWord).filter(Boolean).join(" ");
+    // Prefer the second party word as the distinctive search term; fall back to both
+    const secondParty = parts[1] ? pickWord(parts[1]) : null;
+    const queryTerms = secondParty ?? parts.map(pickWord).filter(Boolean).join(" ");
 
     try {
       const res = await fetch("/api/canlii/lookup", {
@@ -149,6 +172,7 @@ export default function CitationTestPage() {
         body: JSON.stringify({
           type: "case",
           query: queryTerms,
+          databaseId,
           apiKey,
         }),
       });
@@ -159,15 +183,15 @@ export default function CitationTestPage() {
       if (!json.ok) {
         setCaseCanliiState((s) => ({
           ...s,
-          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed." },
+          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed.", fallbackUrl },
         }));
         return;
       }
-      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits } }));
+      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits, fallbackUrl } }));
     } catch (err) {
       setCaseCanliiState((s) => ({
         ...s,
-        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err) },
+        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err), fallbackUrl },
       }));
     }
   }
@@ -615,33 +639,70 @@ export default function CitationTestPage() {
                     {state.status === "loading" && (
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Searching CanLII…</p>
                     )}
+                    {state.status === "no-court" && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                        ⚠ {state.message}.{" "}
+                        <a
+                          href={state.fallbackUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium underline hover:text-amber-900 dark:hover:text-amber-300"
+                        >
+                          Open on CanLII ↗
+                        </a>
+                      </p>
+                    )}
                     {state.status === "error" && (
-                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">⚠ {state.message}</p>
+                      <div className="mt-1">
+                        <p className="text-xs text-amber-700 dark:text-amber-400">⚠ {state.message}</p>
+                        {state.fallbackUrl && (
+                          <a
+                            href={state.fallbackUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-0.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            Open on CanLII ↗
+                          </a>
+                        )}
+                      </div>
                     )}
                     {state.status === "ok" && (
-                      state.hits.length === 0 ? (
-                        <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
-                          No matching case found on CanLII — possibly a hallucinated citation.
-                        </p>
-                      ) : (
-                        <ul className="mt-1.5 space-y-1">
-                          {state.hits.slice(0, 5).map((h, i) => (
-                            <li key={i} className="text-[11px]">
-                              <a
-                                href={h.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                              >
-                                {h.title}
-                              </a>
-                              {h.citation && (
-                                <span className="ml-1 text-slate-500 dark:text-slate-400">· {h.citation}</span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      )
+                      <div>
+                        {state.hits.length === 0 ? (
+                          <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
+                            No matching case found on CanLII — possibly a hallucinated citation.
+                          </p>
+                        ) : (
+                          <ul className="mt-1.5 space-y-1">
+                            {state.hits.slice(0, 5).map((h, i) => (
+                              <li key={i} className="text-[11px]">
+                                <a
+                                  href={h.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                >
+                                  {h.title}
+                                </a>
+                                {h.citation && (
+                                  <span className="ml-1 text-slate-500 dark:text-slate-400">· {h.citation}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {state.fallbackUrl && (
+                          <a
+                            href={state.fallbackUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            Open on CanLII ↗
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

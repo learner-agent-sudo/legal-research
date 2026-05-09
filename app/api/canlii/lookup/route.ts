@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   searchCanLIILegislation,
   searchCanLIICases,
+  searchCanLIICasesByDb,
   toCanLIIJurisdiction,
 } from "@/lib/citations/canlii";
 
@@ -11,6 +12,7 @@ export type CanLIILookupRequest = {
   type: "legislation" | "case";
   query: string;
   jurisdiction?: string;   // e.g. "ontario", "federal" — optional
+  databaseId?: string;     // e.g. "scc", "onca" — takes precedence over jurisdiction for case searches
   apiKey: string;
 };
 
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { type, query, jurisdiction, apiKey } = body;
+  const { type, query, jurisdiction, databaseId, apiKey } = body;
 
   if (!type || !query || !apiKey?.trim()) {
     return NextResponse.json(
@@ -54,6 +56,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (type === "case") {
+    if (databaseId) {
+      const result = await searchCanLIICasesByDb(query, databaseId, apiKey);
+      return NextResponse.json(result);
+    }
     const result = await searchCanLIICases(query, jurisdictionCode, apiKey);
     return NextResponse.json(result);
   }
