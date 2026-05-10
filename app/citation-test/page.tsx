@@ -31,11 +31,11 @@ type VerifyState =
 type CanLIIHit = { title: string; citation: string; url: string };
 
 type FallbackKind = "doc" | "search";
+// Statute citations: CanLII has no text-search API for legislation, so the
+// only reliable action is to open canlii.org search filtered by jurisdiction.
 type CanLIIState =
   | { status: "loading" }
-  | { status: "ok"; hits: CanLIIHit[]; fallbackUrl?: string; fallbackKind?: FallbackKind }
-  | { status: "error"; message: string; fallbackUrl?: string; fallbackKind?: FallbackKind }
-  | { status: "no-court"; message: string; fallbackUrl: string; fallbackKind: FallbackKind };
+  | { status: "search-link"; searchUrl: string; jurisdictionLabel: string };
 
 type CaseDetail = {
   title: string;
@@ -237,58 +237,24 @@ export default function CitationTestPage() {
   }
 
   async function handleCanLIISearch(idx: number, c: ExtractedCitation) {
-    const apiKey =
-      typeof window !== "undefined"
-        ? (() => {
-            try {
-              const raw = window.localStorage.getItem("lr.apiKeys.v1");
-              const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
-              return map.canlii?.trim() ?? "";
-            } catch {
-              return "";
-            }
-          })()
-        : "";
+    // The CanLII API has no text-search endpoint for legislation (the
+    // ?text= param is silently ignored — confirmed via /api/canlii/probe).
+    // The only reliable action is to open the canlii.org search UI with
+    // the act name and jurisdiction pre-populated, so we do that directly
+    // without hitting the API.
+    const jurisdictionCode = c.jurisdiction === "ontario" ? "on" : null;
+    const jurisdictionLabel = c.jurisdiction === "ontario" ? "Ontario" : "all of Canada";
+    const params = new URLSearchParams({
+      text: c.act,
+      type: "legislation",
+    });
+    if (jurisdictionCode) params.set("jurisdiction", jurisdictionCode);
+    const searchUrl = `https://www.canlii.org/en/#search/${params.toString()}`;
 
-    if (!apiKey) {
-      setCanliiState((s) => ({
-        ...s,
-        [idx]: { status: "error", message: "No CanLII API key — add one in Settings." },
-      }));
-      return;
-    }
-
-    setCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
-
-    try {
-      const res = await fetch("/api/canlii/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "legislation",
-          query: c.act,
-          jurisdiction: "ontario",
-          apiKey,
-        }),
-      });
-      const json = (await res.json()) as
-        | { ok: true; hits: { title: string; citation: string; url: string }[]; totalCount: number }
-        | { ok: false; errorKind?: string; message?: string; error?: string };
-
-      if (!json.ok) {
-        setCanliiState((s) => ({
-          ...s,
-          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed." },
-        }));
-        return;
-      }
-      setCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits } }));
-    } catch (err) {
-      setCanliiState((s) => ({
-        ...s,
-        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err) },
-      }));
-    }
+    setCanliiState((s) => ({
+      ...s,
+      [idx]: { status: "search-link", searchUrl, jurisdictionLabel },
+    }));
   }
 
   function handleExtract() {
@@ -480,10 +446,9 @@ export default function CitationTestPage() {
                     </button>
                     <button
                       onClick={() => handleCanLIISearch(idx, c)}
-                      disabled={canliiState[idx]?.status === "loading"}
-                      className="rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
+                      className="rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
                     >
-                      {canliiState[idx]?.status === "loading" ? "Searching CanLII…" : "Search CanLII"}
+                      Find on CanLII
                     </button>
                     {lookup.status === "fetched" && (
                       <button
@@ -503,44 +468,27 @@ export default function CitationTestPage() {
                   <p className="mt-0.5 text-xs italic text-slate-600 dark:text-slate-400">{c.context}</p>
                 </div>
 
-                {/* CanLII results — shown whenever a search has been run */}
-                {canliiState[idx] && (
-                  <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">CanLII results</span>
-                    {canliiState[idx]?.status === "loading" && (
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Searching CanLII…</p>
-                    )}
-                    {canliiState[idx]?.status === "error" && (
-                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                        ⚠ {(canliiState[idx] as { status: "error"; message: string }).message}
+                {/* CanLII search link — the API can't text-search legislation,
+                    so we open the canlii.org search UI directly. */}
+                {canliiState[idx]?.status === "search-link" && (() => {
+                  const s = canliiState[idx] as { status: "search-link"; searchUrl: string; jurisdictionLabel: string };
+                  return (
+                    <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">CanLII</span>
+                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                        CanLII&apos;s API doesn&apos;t support legislation text-search. Open the canlii.org search UI:
                       </p>
-                    )}
-                    {canliiState[idx]?.status === "ok" && (() => {
-                      const hits = (canliiState[idx] as { status: "ok"; hits: CanLIIHit[] }).hits;
-                      return hits.length === 0 ? (
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">No matching legislation found on CanLII.</p>
-                      ) : (
-                        <ul className="mt-1.5 space-y-1">
-                          {hits.slice(0, 5).map((h, i) => (
-                            <li key={i} className="text-[11px]">
-                              <a
-                                href={h.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                              >
-                                {h.title}
-                              </a>
-                              {h.citation && (
-                                <span className="ml-1 text-slate-500 dark:text-slate-400">· {h.citation}</span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      );
-                    })()}
-                  </div>
-                )}
+                      <a
+                        href={s.searchUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1.5 inline-block rounded border border-blue-300 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+                      >
+                        Search &ldquo;{c.act}&rdquo; in {s.jurisdictionLabel} on CanLII ↗
+                      </a>
+                    </div>
+                  );
+                })()}
 
                 {/* Lookup result */}
                 {lookup.status === "fetched" && (
