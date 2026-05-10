@@ -3,16 +3,18 @@ import {
   searchCanLIILegislation,
   searchCanLIICases,
   searchCanLIICasesByDb,
+  getCanLIICaseDetail,
   toCanLIIJurisdiction,
 } from "@/lib/citations/canlii";
 
 export const runtime = "nodejs";
 
 export type CanLIILookupRequest = {
-  type: "legislation" | "case";
-  query: string;
-  jurisdiction?: string;   // e.g. "ontario", "federal" — optional
-  databaseId?: string;     // e.g. "scc", "onca" — takes precedence over jurisdiction for case searches
+  type: "legislation" | "case" | "case-detail";
+  query?: string;
+  jurisdiction?: string;
+  databaseId?: string;
+  caseSlug?: string;       // for type="case-detail" — e.g. "2008scc39"
   apiKey: string;
 };
 
@@ -24,11 +26,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { type, query, jurisdiction, databaseId, apiKey } = body;
+  const { type, query, jurisdiction, databaseId, caseSlug, apiKey } = body;
 
-  if (!type || !query || !apiKey?.trim()) {
+  if (!type || !apiKey?.trim()) {
     return NextResponse.json(
-      { ok: false, error: "Missing required fields: type, query, apiKey" },
+      { ok: false, error: "Missing required fields: type, apiKey" },
+      { status: 400 }
+    );
+  }
+
+  if (type === "case-detail") {
+    if (!databaseId || !caseSlug) {
+      return NextResponse.json(
+        { ok: false, error: "type=case-detail requires databaseId and caseSlug" },
+        { status: 400 }
+      );
+    }
+    const result = await getCanLIICaseDetail(databaseId, caseSlug, apiKey);
+    return NextResponse.json(result);
+  }
+
+  if (!query) {
+    return NextResponse.json(
+      { ok: false, error: "Missing required field: query" },
       { status: 400 }
     );
   }

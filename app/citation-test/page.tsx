@@ -7,7 +7,11 @@ import {
   type ExtractedCitation,
   type ExtractedCaseCitation,
 } from "@/lib/citations/extract";
-import { courtAbbrevToDb, citationToCanLIIDocUrl } from "@/lib/citations/canlii-courts";
+import {
+  courtAbbrevToDb,
+  citationToCanLIIDocUrl,
+  parseNeutralCitation,
+} from "@/lib/citations/canlii-courts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +36,22 @@ type CanLIIState =
   | { status: "ok"; hits: CanLIIHit[]; fallbackUrl?: string; fallbackKind?: FallbackKind }
   | { status: "error"; message: string; fallbackUrl?: string; fallbackKind?: FallbackKind }
   | { status: "no-court"; message: string; fallbackUrl: string; fallbackKind: FallbackKind };
+
+type CaseDetail = {
+  title: string;
+  citation: string;
+  url: string;
+  decisionDate?: string;
+  docketNumber?: string;
+};
+
+type CaseCanLIIState =
+  | { status: "loading" }
+  | { status: "verified"; detail: CaseDetail }
+  | { status: "not-found"; fallbackUrl: string; fallbackKind: FallbackKind }
+  | { status: "no-citation"; message: string; fallbackUrl: string }
+  | { status: "no-court"; message: string; fallbackUrl: string; fallbackKind: FallbackKind }
+  | { status: "error"; message: string; fallbackUrl?: string; fallbackKind?: FallbackKind };
 
 type ModelPreset = {
   label: string;
@@ -107,7 +127,7 @@ export default function CitationTestPage() {
   // CanLII search state per-citation (independent of the main lookup)
   const [canliiState, setCanliiState] = useState<Record<number, CanLIIState>>({});
   // CanLII search state for case citations (separate index space)
-  const [caseCanliiState, setCaseCanliiState] = useState<Record<number, CanLIIState>>({});
+  const [caseCanliiState, setCaseCanliiState] = useState<Record<number, CaseCanLIIState>>({});
 
   async function handleCaseCanLIISearch(idx: number, c: ExtractedCaseCitation) {
     const apiKey =
@@ -131,74 +151,87 @@ export default function CitationTestPage() {
       return;
     }
 
-    // Prefer a deterministic doc URL when the citation parses cleanly;
-    // fall back to a canlii.org search URL otherwise. The doc URL is
-    // robust against API outages or expired keys.
-    const docUrl = c.citation ? citationToCanLIIDocUrl(c.citation) : null;
     const searchUrl = `https://www.canlii.org/en/#search/text=${encodeURIComponent(c.caseName)}&type=decision`;
-    const fallbackUrl = docUrl ?? searchUrl;
-    const fallbackKind: FallbackKind = docUrl ? "doc" : "search";
 
-    // Try to resolve the court from the citation
-    const databaseId = c.citation ? courtAbbrevToDb(c.citation) : null;
-
-    if (!databaseId) {
-      // No recognisable Canadian court — skip the API call and show a link instead
+    // The CanLII API has no text search — only direct case-detail lookup
+    // by ID. So we need a parseable neutral citation (year + court + number)
+    // to verify a case. Without one, link out to canlii.org search.
+    const parsed = c.citation ? parseNeutralCitation(c.citation) : null;
+    if (!parsed) {
       setCaseCanliiState((s) => ({
         ...s,
         [idx]: {
-          status: "no-court",
-          message: "This court is not on CanLII (non-Canadian)",
-          fallbackUrl,
-          fallbackKind,
+          status: "no-citation",
+          message: "No neutral citation detected — can't verify on CanLII",
+          fallbackUrl: searchUrl,
         },
       }));
       return;
     }
 
-    setCaseCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
+    const databaseId = courtAbbrevToDb(c.citation);
+    if (!databaseId) {
+      setCaseCanliiState((s) => ({
+        ...s,
+        [idx]: {
+          status: "no-court",
+          message: "This court is not on CanLII (non-Canadian)",
+          fallbackUrl: searchUrl,
+          fallbackKind: "search",
+        },
+      }));
+      return;
+    }
 
-    // Build a cleaner search query: use the most distinctive word from the second party
-    // e.g. "Honda Canada Inc. v. Keays" → "Keays"
-    const parts = c.caseName.split(/\sv\.?\s/i);
-    const pickWord = (side: string) => {
-      const words = side.trim().split(/\s+/);
-      const meaningful = words.filter(
-        (w) => w.length > 2 && !/^(Inc|Ltd|Corp|Co|The|Of|And|For|v|vs|Her|His|Majesty|Queen|King|Crown|Attorney|General|AG|R)\.?$/i.test(w)
-      );
-      return meaningful[0] ?? words[0];
-    };
-    // Prefer the second party word as the distinctive search term; fall back to both
-    const secondParty = parts[1] ? pickWord(parts[1]) : null;
-    const queryTerms = secondParty ?? parts.map(pickWord).filter(Boolean).join(" ");
+    const caseSlug = `${parsed.year}${parsed.courtSlug}${parsed.number}`;
+    const docUrl = citationToCanLIIDocUrl(c.citation) ?? searchUrl;
+
+    setCaseCanliiState((s) => ({ ...s, [idx]: { status: "loading" } }));
 
     try {
       const res = await fetch("/api/canlii/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: "case",
-          query: queryTerms,
+          type: "case-detail",
           databaseId,
+          caseSlug,
           apiKey,
         }),
       });
       const json = (await res.json()) as
-        | { ok: true; hits: { title: string; citation: string; url: string }[] }
+        | { ok: true; detail: CaseDetail }
         | { ok: false; errorKind?: string; message?: string; error?: string };
 
       if (!json.ok) {
+        if (json.errorKind === "not-found") {
+          setCaseCanliiState((s) => ({
+            ...s,
+            [idx]: { status: "not-found", fallbackUrl: docUrl, fallbackKind: "doc" },
+          }));
+          return;
+        }
         setCaseCanliiState((s) => ({
           ...s,
-          [idx]: { status: "error", message: json.message ?? json.error ?? "CanLII lookup failed.", fallbackUrl, fallbackKind },
+          [idx]: {
+            status: "error",
+            message: json.message ?? json.error ?? "CanLII lookup failed.",
+            fallbackUrl: docUrl,
+            fallbackKind: "doc",
+          },
         }));
         return;
       }
-      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "ok", hits: json.hits, fallbackUrl, fallbackKind } }));
+      setCaseCanliiState((s) => ({ ...s, [idx]: { status: "verified", detail: json.detail } }));
     } catch (err) {
       setCaseCanliiState((s) => ({
         ...s,
-        [idx]: { status: "error", message: err instanceof Error ? err.message : String(err), fallbackUrl, fallbackKind },
+        [idx]: {
+          status: "error",
+          message: err instanceof Error ? err.message : String(err),
+          fallbackUrl: docUrl,
+          fallbackKind: "doc",
+        },
       }));
     }
   }
@@ -631,7 +664,7 @@ export default function CitationTestPage() {
                     disabled={state?.status === "loading"}
                     className="rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-100 disabled:opacity-60 dark:border-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
                   >
-                    {state?.status === "loading" ? "Searching CanLII…" : "Search CanLII"}
+                    {state?.status === "loading" ? "Verifying…" : "Verify on CanLII"}
                   </button>
                 </div>
 
@@ -642,9 +675,63 @@ export default function CitationTestPage() {
 
                 {state && (
                   <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">CanLII results</span>
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">CanLII verification</span>
                     {state.status === "loading" && (
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Searching CanLII…</p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Looking up case on CanLII…</p>
+                    )}
+                    {state.status === "verified" && (
+                      <div className="mt-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                          ✓ Case confirmed on CanLII
+                        </p>
+                        <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">{state.detail.title}</p>
+                        <p className="text-xs font-mono text-slate-600 dark:text-slate-400">{state.detail.citation}</p>
+                        {state.detail.decisionDate && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Decided {state.detail.decisionDate}
+                            {state.detail.docketNumber && <> · Docket {state.detail.docketNumber}</>}
+                          </p>
+                        )}
+                        <a
+                          href={state.detail.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          Read full case on CanLII ↗
+                        </a>
+                      </div>
+                    )}
+                    {state.status === "not-found" && (
+                      <div className="mt-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-900/50 dark:bg-rose-950/30">
+                        <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">
+                          ✗ Citation not found on CanLII
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-rose-700 dark:text-rose-400">
+                          The citation may be incorrect or hallucinated. Double-check before relying on it.
+                        </p>
+                        <a
+                          href={state.fallbackUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          Try this URL anyway ↗
+                        </a>
+                      </div>
+                    )}
+                    {state.status === "no-citation" && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                        ⚠ {state.message}.{" "}
+                        <a
+                          href={state.fallbackUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium underline hover:text-amber-900 dark:hover:text-amber-300"
+                        >
+                          Search CanLII ↗
+                        </a>
+                      </p>
                     )}
                     {state.status === "no-court" && (
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
@@ -655,7 +742,7 @@ export default function CitationTestPage() {
                           rel="noreferrer"
                           className="font-medium underline hover:text-amber-900 dark:hover:text-amber-300"
                         >
-                          {state.fallbackKind === "doc" ? "Read this case on CanLII ↗" : "Search CanLII ↗"}
+                          Search CanLII ↗
                         </a>
                       </p>
                     )}
@@ -668,43 +755,6 @@ export default function CitationTestPage() {
                             target="_blank"
                             rel="noreferrer"
                             className="mt-0.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
-                            {state.fallbackKind === "doc" ? "Read this case on CanLII ↗" : "Search CanLII ↗"}
-                          </a>
-                        )}
-                      </div>
-                    )}
-                    {state.status === "ok" && (
-                      <div>
-                        {state.hits.length === 0 ? (
-                          <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
-                            No matching case found on CanLII — possibly a hallucinated citation.
-                          </p>
-                        ) : (
-                          <ul className="mt-1.5 space-y-1">
-                            {state.hits.slice(0, 5).map((h, i) => (
-                              <li key={i} className="text-[11px]">
-                                <a
-                                  href={h.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                                >
-                                  {h.title}
-                                </a>
-                                {h.citation && (
-                                  <span className="ml-1 text-slate-500 dark:text-slate-400">· {h.citation}</span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {state.fallbackUrl && (
-                          <a
-                            href={state.fallbackUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1.5 inline-block text-[11px] font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                           >
                             {state.fallbackKind === "doc" ? "Read this case on CanLII ↗" : "Search CanLII ↗"}
                           </a>

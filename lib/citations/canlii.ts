@@ -243,3 +243,127 @@ export async function searchCanLIICasesByDb(
   const path = `/caseBrowse/en/${encodeURIComponent(databaseId)}/?text=${q}`;
   return canliiFetch(path, apiKey, parseCaseHits);
 }
+
+// ── Case detail lookup ────────────────────────────────────────────────────────
+
+/**
+ * Direct case-detail lookup by citation slug. Unlike search, this is the
+ * only reliable way to verify a known citation: the CanLII API has no
+ * text-search endpoint, but it does have direct case lookup by ID.
+ *
+ * databaseId: e.g. "csc-scc"
+ * caseSlug:   e.g. "2008scc39" (year + lowercase court + number, no spaces)
+ */
+export type CanLIICaseDetail = {
+  databaseId: string;
+  caseId: string;
+  url: string;        // canonical short URL, e.g. https://canlii.ca/t/1z469
+  title: string;
+  citation: string;
+  decisionDate?: string;
+  docketNumber?: string;
+  keywords?: string;
+  language?: string;
+};
+
+type RawCaseDetail = {
+  databaseId?: string;
+  caseId?: string;
+  url?: string;
+  title?: string;
+  citation?: string;
+  decisionDate?: string;
+  docketNumber?: string;
+  keywords?: string;
+  language?: string;
+};
+
+export async function getCanLIICaseDetail(
+  databaseId: string,
+  caseSlug: string,
+  apiKey: string
+): Promise<
+  | { ok: true; detail: CanLIICaseDetail }
+  | { ok: false; errorKind: CanLIIError; message: string }
+> {
+  if (!apiKey?.trim()) {
+    return { ok: false, errorKind: "no-key", message: "No CanLII API key configured. Add one in Settings." };
+  }
+
+  const url =
+    `${CANLII_BASE}/caseBrowse/en/${encodeURIComponent(databaseId)}/${encodeURIComponent(caseSlug)}/` +
+    `?api_key=${encodeURIComponent(apiKey)}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      errorKind: "network-error",
+      message: `CanLII network error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return {
+      ok: false,
+      errorKind: "auth-error",
+      message: "CanLII API key is invalid or has expired. Update it in Settings.",
+    };
+  }
+  if (res.status === 404) {
+    return {
+      ok: false,
+      errorKind: "not-found",
+      message: "Case not found on CanLII — citation may be incorrect or hallucinated.",
+    };
+  }
+  if (res.status === 429) {
+    return {
+      ok: false,
+      errorKind: "network-error",
+      message: "CanLII rate limit hit (429). Please wait a moment and try again.",
+    };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      errorKind: "network-error",
+      message: `CanLII returned HTTP ${res.status}.`,
+    };
+  }
+
+  let json: RawCaseDetail;
+  try {
+    json = (await res.json()) as RawCaseDetail;
+  } catch {
+    return { ok: false, errorKind: "parse-error", message: "CanLII returned non-JSON response." };
+  }
+
+  if (!json.title || !json.caseId) {
+    return {
+      ok: false,
+      errorKind: "parse-error",
+      message: "CanLII case-detail response missing required fields.",
+    };
+  }
+
+  return {
+    ok: true,
+    detail: {
+      databaseId: json.databaseId ?? databaseId,
+      caseId: json.caseId,
+      url: json.url ?? `https://www.canlii.org/en/`,
+      title: json.title,
+      citation: json.citation ?? "",
+      decisionDate: json.decisionDate,
+      docketNumber: json.docketNumber,
+      keywords: json.keywords,
+      language: json.language,
+    },
+  };
+}
