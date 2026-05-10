@@ -119,6 +119,7 @@ export default function CitationTestPage() {
   const [text, setText] = useState(SAMPLE_TEXT);
   const [citations, setCitations] = useState<ExtractedCitation[]>([]);
   const [caseCitations, setCaseCitations] = useState<ExtractedCaseCitation[]>([]);
+  const [hasExtracted, setHasExtracted] = useState(false);
   const [lookups, setLookups] = useState<Record<number, LookupState>>({});
   const [verifies, setVerifies] = useState<Record<number, VerifyState>>({});
   const [selectedModel, setSelectedModel] = useState(0);
@@ -264,6 +265,7 @@ export default function CitationTestPage() {
     setVerifies({});
     setCanliiState({});
     setCaseCanliiState({});
+    setHasExtracted(true);
   }
 
   async function handleLookup(idx: number, c: ExtractedCitation) {
@@ -353,13 +355,17 @@ export default function CitationTestPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-          Citation checker — test bench
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
+          Citation checker
         </h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Paste a legal answer → extract Ontario citations → fetch live section text from e-Laws →
-          have an AI model judge whether Claude&apos;s claim matches.
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
+          Paste any legal answer and extract the citations it relies on. For each one you can:
         </p>
+        <ul className="mt-1.5 ml-4 list-disc text-xs text-slate-600 dark:text-slate-400 sm:text-sm">
+          <li><strong>Verify cases on CanLII</strong> — confirms the citation is real, returns the title, decision date, and a link to read the full case</li>
+          <li><strong>Find statutes on CanLII</strong> — opens the canlii.org search filtered by jurisdiction</li>
+          <li><strong>Fetch live text + AI verify</strong> — pulls the actual section text from Ontario&apos;s e-Laws and asks an AI whether Claude&apos;s claim matches</li>
+        </ul>
       </header>
 
       {/* Model selector */}
@@ -414,6 +420,13 @@ export default function CitationTestPage() {
           </button>
         </div>
       </section>
+
+      {/* Empty-result feedback */}
+      {hasExtracted && citations.length === 0 && caseCitations.length === 0 && (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300 sm:p-4 sm:text-sm">
+          No citations detected. The extractor recognises Canadian neutral citations (e.g. <code className="font-mono">2008 SCC 39</code>) and statute references with section numbers (e.g. <code className="font-mono">section 14(2) of the Employment Standards Act, 2000</code>). Try the &ldquo;Reset to sample&rdquo; button for examples.
+        </section>
+      )}
 
       {/* Results */}
       {citations.length > 0 && (

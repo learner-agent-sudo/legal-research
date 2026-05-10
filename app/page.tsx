@@ -660,8 +660,28 @@ export default function HomePage() {
     );
   }
 
+  const isFirstRun =
+    !userQuestion.trim() && !claudeAnswer.trim() && !documentText.trim() && Object.keys(results).length === 0;
+
   return (
     <div className="space-y-5">
+      {isFirstRun && (
+        <section className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 text-sm dark:border-blue-900/50 dark:bg-blue-950/30 sm:p-4">
+          <h1 className="text-base font-semibold text-blue-900 dark:text-blue-200">
+            Cross-check an AI answer against multiple models
+          </h1>
+          <p className="mt-1 text-xs text-blue-800/80 dark:text-blue-300/80 sm:text-sm">
+            Paste an AI answer below, optionally attach the source document, then pick which models should verify it.
+            Each one returns a 🟢 / 🟡 / 🔴 verdict that you can synthesise into a single report.
+          </p>
+          <p className="mt-2 text-xs text-blue-700/70 dark:text-blue-400/70">
+            New here? Check <Link href="/settings" className="font-medium underline">Settings</Link> first to add a
+            free API key (Groq is the fastest), or try the <Link href="/citation-test" className="font-medium underline">Citations</Link> page
+            to verify case and statute references against CanLII.
+          </p>
+        </section>
+      )}
+
       <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         {sectionHeader(1, "Your question", "Optional — gives the AI context for what was asked.")}
         <textarea

@@ -214,10 +214,18 @@ export default function HistoryPage() {
       )}
 
       {loadState === "ok" && summaries.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
-          <p className="text-slate-500 dark:text-slate-400">
-            Your verification runs will appear here once you run a Verify.
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-900 sm:p-8">
+          <p className="text-3xl">📂</p>
+          <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">No saved runs yet</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+            Verification runs are saved automatically while you&apos;re signed in. Run one to see it here.
           </p>
+          <a
+            href="/"
+            className="mt-3 inline-block rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Start a verification →
+          </a>
         </div>
       )}
 

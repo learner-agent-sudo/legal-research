@@ -64,6 +64,7 @@ const MOBILE_NAV_LINKS = [
   { href: "/", label: "Verify" },
   { href: "/prompts", label: "Prompts" },
   { href: "/citation-test", label: "Citations" },
+  { href: "/history", label: "History" },
   { href: "/diag", label: "Diagnostics" },
   { href: "/settings", label: "Settings" },
 ];
