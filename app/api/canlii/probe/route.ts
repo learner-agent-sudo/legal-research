@@ -2,14 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-/**
- * Probes multiple CanLII API endpoint shapes to figure out which ones work.
- * We try the same logical query several different ways so we can see which
- * paths return data, which 404, and which silently return empty results.
- *
- * Body: { apiKey: string, citation?: string }
- * Default citation: "2008 SCC 39" (Honda Canada Inc. v. Keays)
- */
 type Probe = {
   label: string;
   url: string;
@@ -33,95 +25,59 @@ async function probeOne(label: string, urlNoKey: string, apiKey: string): Promis
     try {
       const j = JSON.parse(text);
       if (j && typeof j === "object" && !Array.isArray(j)) topLevelKeys = Object.keys(j);
-    } catch {
-      // not JSON
-    }
-    return {
-      label,
-      url: urlNoKey,
-      status: res.status,
-      ms,
-      bodyPreview: text.slice(0, 400),
-      topLevelKeys,
-    };
+    } catch { /* not JSON */ }
+    return { label, url: urlNoKey, status: res.status, ms, bodyPreview: text.slice(0, 500), topLevelKeys };
   } catch (err) {
-    return {
-      label,
-      url: urlNoKey,
-      status: "error",
-      ms: Date.now() - t0,
-      bodyPreview: err instanceof Error ? err.message : String(err),
-    };
+    return { label, url: urlNoKey, status: "error", ms: Date.now() - t0, bodyPreview: err instanceof Error ? err.message : String(err) };
   }
 }
 
 export async function POST(req: NextRequest) {
-  let body: { apiKey?: string; citation?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
-  }
+  let body: { apiKey?: string; citation?: string; legislationQuery?: string };
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 }); }
 
   const apiKey = body.apiKey?.trim();
-  if (!apiKey) {
-    return NextResponse.json({ ok: false, error: "Missing apiKey in body" }, { status: 400 });
-  }
-
-  // Defaults to Honda v Keays — a real, well-known SCC case.
-  const citation = body.citation?.trim() || "2008 SCC 39";
-  const m = citation.match(/(?:\[)?(\d{4})(?:\])?\s+([A-Z]{2,8})\s+(\d+)/);
-  if (!m) {
-    return NextResponse.json(
-      { ok: false, error: `Citation "${citation}" couldn't be parsed into year+court+number` },
-      { status: 400 }
-    );
-  }
-  const [, year, courtUpper, num] = m;
-  const courtLower = courtUpper.toLowerCase();
-  const slug = `${year}${courtLower}${num}`;
+  if (!apiKey) return NextResponse.json({ ok: false, error: "Missing apiKey" }, { status: 400 });
 
   const base = "https://api.canlii.org/v1";
+  const legQuery = body.legislationQuery ?? "Labour Relations Act";
+  const legQ = encodeURIComponent(legQuery);
 
-  // Try several shapes for the same query in parallel
   const probes = await Promise.all([
-    // Confirm the key works at all
-    probeOne("databases-list", `${base}/caseBrowse/en/`, apiKey),
-    // Direct case-detail lookups using different DB ID forms
-    probeOne(`case-detail (db=csc-scc)`, `${base}/caseBrowse/en/csc-scc/${slug}/`, apiKey),
-    probeOne(`case-detail (db=${courtLower})`, `${base}/caseBrowse/en/${courtLower}/${slug}/`, apiKey),
-    // Browse the database (paginated list, no text filter)
-    probeOne(`db-browse (db=csc-scc)`, `${base}/caseBrowse/en/csc-scc/?resultCount=3`, apiKey),
-    probeOne(`db-browse (db=${courtLower})`, `${base}/caseBrowse/en/${courtLower}/?resultCount=3`, apiKey),
-    // The "text=" syntax we'd been using — confirm it's ignored / unsupported
-    probeOne(
-      `db-browse with text= (db=csc-scc)`,
-      `${base}/caseBrowse/en/csc-scc/?text=Keays&resultCount=3`,
-      apiKey
-    ),
+    // ── Legislation probes ─────────────────────────────────────────────────
+    // Does ?text= work on the legislation browse root?
+    probeOne("leg: root ?text=", `${base}/legislationBrowse/en/?text=${legQ}`, apiKey),
+    // Does ?text= + jurisdiction work?
+    probeOne("leg: root ?text= +jurisdiction=on", `${base}/legislationBrowse/en/?text=${legQ}&jurisdiction=on`, apiKey),
+    // List all legislation databases (no filter)
+    probeOne("leg: databases list", `${base}/legislationBrowse/en/`, apiKey),
+    // Does an Ontario legislation database exist?
+    probeOne("leg: db=onlra (LRA)", `${base}/legislationBrowse/en/onlra/`, apiKey),
+    probeOne("leg: db=onlra offset=0", `${base}/legislationBrowse/en/onlra/?offset=0&resultCount=5`, apiKey),
+    // Try a known Ontario db slug
+    probeOne("leg: db=on ?text=", `${base}/legislationBrowse/en/on/?text=${legQ}`, apiKey),
   ]);
 
-  // Try to extract the actual SCC database ID from the databases-list result
-  let sccDbIds: string[] = [];
+  // Extract first few legislation database IDs from the databases list
+  let legDbs: { databaseId: string; jurisdiction: string; name: string }[] = [];
   try {
-    const list = probes[0];
-    if (typeof list.status === "number" && list.status === 200) {
-      const j = JSON.parse(list.bodyPreview);
-      if (Array.isArray(j?.caseDatabases)) {
-        sccDbIds = j.caseDatabases
-          .filter((d: { name?: string }) => /supreme court of canada/i.test(d.name ?? ""))
-          .map((d: { databaseId?: string }) => d.databaseId ?? "");
+    const listProbe = probes.find(p => p.label === "leg: databases list");
+    if (listProbe && listProbe.status === 200) {
+      const j = JSON.parse(listProbe.bodyPreview);
+      const arr = j?.legislationDatabases ?? j?.databases ?? [];
+      if (Array.isArray(arr)) {
+        legDbs = arr
+          .filter((d: { jurisdiction?: string }) => d.jurisdiction === "on" || d.jurisdiction === "ca")
+          .slice(0, 10)
+          .map((d: { databaseId?: string; jurisdiction?: string; name?: string }) => ({
+            databaseId: d.databaseId ?? "",
+            jurisdiction: d.jurisdiction ?? "",
+            name: d.name ?? "",
+          }));
       }
     }
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
 
-  return NextResponse.json({
-    ok: true,
-    citation,
-    parsed: { year, court: courtUpper, number: num, slug },
-    sccDbIdsFromList: sccDbIds,
-    probes,
-  });
+  return NextResponse.json({ ok: true, legislationQuery: legQuery, legDbs, probes });
 }
