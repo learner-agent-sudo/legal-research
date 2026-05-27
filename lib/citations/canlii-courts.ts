@@ -114,22 +114,19 @@ export const COURT_TO_JURISDICTION: Record<string, string> = {
   NUCJ: "nu", NUCA: "nu",
 };
 
+// Reporters whose page numbers are NOT the same as CanLII case IDs.
+// For these we can resolve the court but can't do a direct API lookup.
+export const REPORTER_CODES = new Set(["SCR", "DLR", "OR", "OAC", "OLR", "AC", "WLR", "ER"]);
+
 /**
  * Parse a citation into its three components for CanLII lookup.
- *
- * Handles:
- *   2008 SCC 39            neutral — year-first
- *   [2019] ONCA 123        neutral — bracketed year, no volume
- *   [1992] 1 SCR 623       reporter — bracketed year + volume + reporter + page
- *
- * Reporter citations (SCR, DLR, OR, etc.) are resolved to the court they
- * primarily report on so we can build a CanLII case-detail lookup.
- * Returns null for unrecognised patterns.
+ * Returns `kind: "neutral"` for citations whose number IS the CanLII case ID,
+ * or `kind: "reporter"` when the number is a reporter page (can't do direct lookup).
  */
 export function parseNeutralCitation(
   citation: string
-): { year: number; courtAbbrev: string; courtSlug: string; number: number } | null {
-  // Form 1: year-first neutral e.g. "2008 SCC 39" or "[2019] ONCA 123" (no volume)
+): { year: number; courtAbbrev: string; courtSlug: string; number: number; kind: "neutral" | "reporter" } | null {
+  // Form 1: neutral e.g. "2008 SCC 39" or "[2019] ONCA 123" (no volume)
   const neutralM = citation.match(/(?:\[)?(\d{4})(?:\])?\s+([A-Z]{2,8})\s+(\d+)/);
   if (neutralM) {
     const courtUpper = neutralM[2];
@@ -139,12 +136,12 @@ export function parseNeutralCitation(
         courtAbbrev: courtUpper,
         courtSlug: courtUpper.toLowerCase(),
         number: parseInt(neutralM[3], 10),
+        kind: REPORTER_CODES.has(courtUpper) ? "reporter" : "neutral",
       };
     }
   }
 
-  // Form 2: reporter with volume e.g. "[1992] 1 SCR 623"
-  // Pattern: [year] volume REPORTER page
+  // Form 2: reporter with volume e.g. "[1992] 1 SCR 623" → [year] vol REPORTER page
   const reporterM = citation.match(/\[(\d{4})\]\s+\d+\s+([A-Z]{2,6})\s+(\d+)/);
   if (reporterM) {
     const reporterUpper = reporterM[2];
@@ -154,16 +151,13 @@ export function parseNeutralCitation(
         courtAbbrev: reporterUpper,
         courtSlug: reporterUpper.toLowerCase(),
         number: parseInt(reporterM[3], 10),
+        kind: "reporter",
       };
     }
   }
 
   return null;
 }
-
-// Reporters whose page numbers are NOT the same as CanLII case IDs.
-// For these we can resolve the court but can't build a direct doc URL.
-const REPORTER_CODES = new Set(["SCR", "DLR", "OR", "OAC", "OLR", "AC", "WLR", "ER"]);
 
 /**
  * Build a deterministic canlii.org case URL from a neutral citation.

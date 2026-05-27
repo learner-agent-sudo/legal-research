@@ -155,8 +155,9 @@ export default function CitationTestPage() {
     const searchUrl = `https://www.canlii.org/en/#search/text=${encodeURIComponent(c.caseName)}&type=decision`;
 
     // The CanLII API has no text search — only direct case-detail lookup
-    // by ID. So we need a parseable neutral citation (year + court + number)
-    // to verify a case. Without one, link out to canlii.org search.
+    // by ID. So we need a neutral citation (year + court + number) to verify
+    // a case. Reporter citations (SCR, DLR, etc.) give us a page number, not
+    // a case ID, so we can't do the API call for those either.
     const parsed = c.citation ? parseNeutralCitation(c.citation) : null;
     if (!parsed) {
       setCaseCanliiState((s) => ({
@@ -164,6 +165,20 @@ export default function CitationTestPage() {
         [idx]: {
           status: "no-citation",
           message: "No neutral citation detected — can't verify on CanLII",
+          fallbackUrl: searchUrl,
+        },
+      }));
+      return;
+    }
+
+    if (parsed.kind === "reporter") {
+      // Reporter citations (e.g. [1992] 1 SCR 623) have page numbers, not
+      // CanLII case IDs — direct lookup would always 404. Show a search link.
+      setCaseCanliiState((s) => ({
+        ...s,
+        [idx]: {
+          status: "no-citation",
+          message: `Reporter citation (${parsed.courtAbbrev}) — can't look up by page number`,
           fallbackUrl: searchUrl,
         },
       }));
