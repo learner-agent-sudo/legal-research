@@ -129,9 +129,16 @@ export function extractCaseCitations(text: string): ExtractedCaseCitation[] {
   const nameRe =
     /\b([A-Z][\w.'-]+(?:\s+(?:[A-Z][\w.'-]+|of|the|and))*)\s+v\.?\s+([A-Z][\w.'-]+(?:\s+(?:[A-Z][\w.'-]+|of|the|and))*)\b/g;
 
-  // Match a citation immediately after the name (with optional comma/spaces)
+  // Match a citation immediately after the name (with optional markdown close
+  // markers *, **, _ and comma/spaces before the year).
+  //
+  // Supported citation forms:
+  //   2008 SCC 39            (neutral — year-first)
+  //   [2019] ONCA 123        (neutral — bracketed year, no volume)
+  //   [1992] 1 SCR 623       (reporter — bracketed year + volume number)
+  //   (2019), 50 OR (3d) 1   (parallel)
   const citRe =
-    /^[,\s]*((?:\[\d{4}\]\s+[A-Z][A-Z\d]*[A-Za-z]*(?:\s*\([^)]+\))?\s+\d+|\d{4}\s+[A-Z][A-Z\d]+(?:\s*\([^)]+\))?\s+\d+|\(\d{4}\),?\s+\d+[^.;\n]{0,40}?\d+(?:\s*\([A-Z][^)]*\))?))/;
+    /^[*_~,\s]*((?:\[\d{4}\]\s+\d+\s+[A-Z]+(?:\s*\([^)]+\))?\s+\d+|\[\d{4}\]\s+[A-Z][A-Z\d]*[A-Za-z]*(?:\s*\([^)]+\))?\s+\d+|\d{4}\s+[A-Z][A-Z\d]+(?:\s*\([^)]+\))?\s+\d+|\(\d{4}\),?\s+\d+[^.;\n]{0,40}?\d+(?:\s*\([A-Z][^)]*\))?))/;
 
   for (const m of text.matchAll(nameRe)) {
     const left = m[1].trim().replace(/\s+/g, " ");
@@ -146,8 +153,10 @@ export function extractCaseCitations(text: string): ExtractedCaseCitation[] {
     if (seen.has(key)) continue;
 
     const start = m.index ?? 0;
-    const after = text.slice(start + m[0].length, start + m[0].length + 120);
-    const citMatch = after.match(citRe);
+    // Strip any trailing markdown markers (e.g. the closing * in "*Case v Case*")
+    // from the after-string before matching the citation pattern.
+    const rawAfter = text.slice(start + m[0].length, start + m[0].length + 160);
+    const citMatch = rawAfter.match(citRe);
     const citation = citMatch ? citMatch[1].trim() : "";
     const fullLength = m[0].length + (citMatch ? citMatch[0].length : 0);
 

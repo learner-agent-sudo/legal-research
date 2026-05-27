@@ -10,6 +10,9 @@ export const COURT_TO_DB: Record<string, string> = {
   // Supreme Court of Canada — bilingual code
   "SCC": "csc-scc",
   "CSC": "csc-scc",
+  // SCR / DLR / OR etc are reporters, not court codes — they point to SCC
+  // for the purposes of CanLII lookup (all SCR volumes are SCC decisions).
+  "SCR": "csc-scc",
   // Federal courts — bilingual codes
   "FCA": "caf-fca",   // Cour d'appel fédérale / Federal Court of Appeal
   "CAF": "caf-fca",
@@ -92,7 +95,7 @@ export function courtAbbrevToDb(citation: string): string | null {
  * and unilingual lowercase court slugs (e.g. /en/ca/scc/, /en/on/onca/).
  */
 export const COURT_TO_JURISDICTION: Record<string, string> = {
-  SCC: "ca", CSC: "ca",
+  SCC: "ca", CSC: "ca", SCR: "ca",
   FCA: "ca", CAF: "ca",
   FC: "ca", CF: "ca", FCJ: "ca", FCT: "ca",
   TCC: "ca",
@@ -112,34 +115,67 @@ export const COURT_TO_JURISDICTION: Record<string, string> = {
 };
 
 /**
- * Parse a neutral citation into its three components.
- * Accepts "2008 SCC 39", "[2019] ONCA 123", etc.
- * Returns null if the citation isn't a parseable neutral form (e.g. parallel
- * citations like "(2019), 50 OR (3d) 1" don't have a usable doc slug).
+ * Parse a citation into its three components for CanLII lookup.
+ *
+ * Handles:
+ *   2008 SCC 39            neutral — year-first
+ *   [2019] ONCA 123        neutral — bracketed year, no volume
+ *   [1992] 1 SCR 623       reporter — bracketed year + volume + reporter + page
+ *
+ * Reporter citations (SCR, DLR, OR, etc.) are resolved to the court they
+ * primarily report on so we can build a CanLII case-detail lookup.
+ * Returns null for unrecognised patterns.
  */
 export function parseNeutralCitation(
   citation: string
 ): { year: number; courtAbbrev: string; courtSlug: string; number: number } | null {
-  const m = citation.match(/(?:\[)?(\d{4})(?:\])?\s+([A-Z]{2,8})\s+(\d+)/);
-  if (!m) return null;
-  const courtUpper = m[2];
-  if (!COURT_TO_JURISDICTION[courtUpper]) return null;
-  return {
-    year: parseInt(m[1], 10),
-    courtAbbrev: courtUpper,
-    courtSlug: courtUpper.toLowerCase(),
-    number: parseInt(m[3], 10),
-  };
+  // Form 1: year-first neutral e.g. "2008 SCC 39" or "[2019] ONCA 123" (no volume)
+  const neutralM = citation.match(/(?:\[)?(\d{4})(?:\])?\s+([A-Z]{2,8})\s+(\d+)/);
+  if (neutralM) {
+    const courtUpper = neutralM[2];
+    if (COURT_TO_JURISDICTION[courtUpper]) {
+      return {
+        year: parseInt(neutralM[1], 10),
+        courtAbbrev: courtUpper,
+        courtSlug: courtUpper.toLowerCase(),
+        number: parseInt(neutralM[3], 10),
+      };
+    }
+  }
+
+  // Form 2: reporter with volume e.g. "[1992] 1 SCR 623"
+  // Pattern: [year] volume REPORTER page
+  const reporterM = citation.match(/\[(\d{4})\]\s+\d+\s+([A-Z]{2,6})\s+(\d+)/);
+  if (reporterM) {
+    const reporterUpper = reporterM[2];
+    if (COURT_TO_JURISDICTION[reporterUpper]) {
+      return {
+        year: parseInt(reporterM[1], 10),
+        courtAbbrev: reporterUpper,
+        courtSlug: reporterUpper.toLowerCase(),
+        number: parseInt(reporterM[3], 10),
+      };
+    }
+  }
+
+  return null;
 }
+
+// Reporters whose page numbers are NOT the same as CanLII case IDs.
+// For these we can resolve the court but can't build a direct doc URL.
+const REPORTER_CODES = new Set(["SCR", "DLR", "OR", "OAC", "OLR", "AC", "WLR", "ER"]);
 
 /**
  * Build a deterministic canlii.org case URL from a neutral citation.
- * E.g. "2008 SCC 39" → https://www.canlii.org/en/ca/scc/doc/2008/2008scc39/2008scc39.html
- * Returns null if the citation can't be parsed (no year/court/number triple).
+ * Only works for neutral citations (e.g. "2008 SCC 39", "[2019] ONCA 123")
+ * where the number IS the CanLII case ID.
+ * Returns null for reporter citations ([1992] 1 SCR 623) and unrecognised forms.
  */
 export function citationToCanLIIDocUrl(citation: string): string | null {
   const p = parseNeutralCitation(citation);
   if (!p) return null;
+  // Reporter citations have their number as a page number, not a CanLII ID
+  if (REPORTER_CODES.has(p.courtAbbrev)) return null;
   const jurisdiction = COURT_TO_JURISDICTION[p.courtAbbrev];
   const slug = `${p.year}${p.courtSlug}${p.number}`;
   return `https://www.canlii.org/en/${jurisdiction}/${p.courtSlug}/doc/${p.year}/${slug}/${slug}.html`;
