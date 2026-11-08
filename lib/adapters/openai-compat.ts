@@ -14,6 +14,8 @@ export async function callOpenAICompat({
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
   const res = await fetch(url, {
     method: "POST",
+    // Never let a provider bounce the request (and its key) to another address.
+    redirect: "error",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,

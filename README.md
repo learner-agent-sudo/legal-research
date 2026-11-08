@@ -10,7 +10,7 @@ A small webpage that lets you take an answer from one AI (e.g. Claude) and have 
 - **Google Gemini** — Gemini 2.5 Flash, 2.5 Pro (free tier)
 - **Mistral** — Mistral Small (free tier)
 
-**Add any other OpenAI-compatible provider manually** via the Settings page (e.g. DeepSeek direct, Together AI, local LM Studio).
+**Add any other OpenAI-compatible provider manually** via the Settings page (e.g. DeepSeek direct, Together AI, or local LM Studio when running with `npm run dev`).
 
 **Manual paste only (no free API)**
 - ChatGPT — opens chat.openai.com with the prompt copied to your clipboard
@@ -36,7 +36,13 @@ Open <http://localhost:3000>. Go to **Settings**, paste at least one API key (Gr
 3. Click Deploy. No env vars needed — the app works with browser-stored keys.
 4. Open the resulting URL on any machine, go to Settings, paste your keys.
 
-If you prefer keys server-side instead, set `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY` in Vercel's environment variables. The API route falls back to those if no key is sent from the browser.
+If you prefer keys server-side instead, set `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY` in Vercel's environment variables. The API route falls back to those if no key is sent from the browser, but only for signed-in users, and only ever sends them to the providers' own fixed addresses (`https://api.groq.com/openai/v1`, `https://openrouter.ai/api/v1`, `https://api.mistral.ai/v1` and Google's Gemini API). Each signed-in user can make up to 300 requests a day on these keys.
+
+### Limits on `/api/chat`
+
+- Each visitor's address can send up to 300 requests every 10 minutes. The counts are kept in Upstash Redis when it's connected; without it, each server instance keeps its own rough count.
+- A prompt can be up to 300,000 characters long.
+- A custom base URL from the Settings page must start with `https://` and point at a public server. Local endpoints such as LM Studio only work when you run the site yourself with `npm run dev`.
 
 ## Where to get free API keys
 

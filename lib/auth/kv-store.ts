@@ -66,6 +66,17 @@ export async function incrementOtpAttempts(email: string): Promise<number> {
   return await client().incr(`otp:attempts:${emailKey(email)}`);
 }
 
+// ---------- Rate limiting ----------
+
+/** Adds one to `key`'s counter for the current fixed time window and returns the new count. */
+export async function incrementWindowCounter(key: string, windowSeconds: number): Promise<number> {
+  const r = client();
+  const bucket = `${key}:${Math.floor(Date.now() / (windowSeconds * 1000))}`;
+  const count = await r.incr(bucket);
+  if (count === 1) await r.expire(bucket, windowSeconds * 2);
+  return count;
+}
+
 // ---------- User key storage ----------
 
 export async function getUserKeys(email: string): Promise<UserKeys | null> {

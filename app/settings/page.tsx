@@ -340,7 +340,7 @@ export default function SettingsPage() {
             <li>DeepSeek direct — base URL <code>https://api.deepseek.com/v1</code>, model <code>deepseek-chat</code></li>
             <li>Mistral — base URL <code>https://api.mistral.ai/v1</code>, model <code>mistral-small-latest</code></li>
             <li>Together AI — base URL <code>https://api.together.xyz/v1</code></li>
-            <li>Any local LLM with an OpenAI-compatible endpoint (LM Studio, llama.cpp server)</li>
+            <li>Any local LLM with an OpenAI-compatible endpoint (LM Studio, llama.cpp server), only when you run this site on your own computer with <code>npm run dev</code></li>
           </ul>
         </details>
       </section>
